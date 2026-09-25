@@ -1,6 +1,6 @@
 # Phase 01 — Policy and boundary validation
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (implemented on branch `phase-01-policy-boundaries`, tests passing)
 
 ## Goal
 
@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Write named failing cases for every limit and malformed-field class.
-- [ ] Implement the smallest validators and allowlisted serializer matching LLD.
-- [ ] Run targeted tests, inspect captured logs for synthetic markers, and review the contract.
+- [x] Write named failing cases for every limit and malformed-field class.
+- [x] Implement the smallest validators and allowlisted serializer matching LLD.
+- [x] Run targeted tests, inspect captured logs for synthetic markers, and review the contract.
 
 ## Tests and verification
 
