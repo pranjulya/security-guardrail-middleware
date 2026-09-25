@@ -54,4 +54,6 @@ Which assumptions invalidate the security claim? How does a local library differ
 
 ## Review gate and evidence record
 
+Branch: `phase-00-contract-environment` → PR into `main`. One branch + one PR per phase.
+
 A reviewer checks scoped changes, failure evidence and privacy. Owner accepts any changed requirement or ADR. Evidence record at execution: date, commit, commands, actual results, policy/model versions, reviewer, limitations and rollback action. Roll back the phase change as a unit if its security contract regresses; never disable mandatory checks to pass. Only then mark COMPLETE and unlock the next phase.
