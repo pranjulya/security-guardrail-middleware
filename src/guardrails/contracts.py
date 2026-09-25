@@ -53,7 +53,7 @@ class EnvelopeError(Exception):
 @dataclass(frozen=True)
 class ValidatedEnvelope:
     boundary: Boundary
-    text: str
+    text: str = field(repr=False)
     language: str
     request_id: str
     policy_id: str
@@ -70,7 +70,7 @@ class Decision:
     policy_version: str
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
-    safe_text: Optional[str] = None
+    safe_text: Optional[str] = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self.action is Action.BLOCK and self.safe_text is not None:

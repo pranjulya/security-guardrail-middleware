@@ -5,8 +5,8 @@ Status: DRAFT — provisional, pending owner acceptance of targets and ADRs.
 ## Gates
 
 - [x] Deterministic enforcement invariants pass (`tests/evaluation/test_invariants.py`, 9 cases).
-- [x] Full regression passes (61 tests: contracts 12, PII 14, injection 7, tool-auth 7, pipeline 12, invariants 9).
-- [x] Dev-eval report generated (`reports/evaluation/phase05-dev/`): per-category precision/recall, leakage 0, warm timing p50/p95, content-free export, canary check.
+- [x] Full regression passes (68 tests after review-01 fixes).
+- [x] Dev-eval report generated (`reports/evaluation/review01-postfix/`): per-category precision/recall, leakage 0, warm timing p50/p95, content-free export, canary check.
 - [ ] Held-out evaluation on disjoint fixtures (>=100 positives/category, 120 injection, 200 benign, 40 enforcement) — NOT RUN; dev fixtures only.
 - [ ] PRD targets accepted or scope revised: PII recall >=95%/precision >=90% per category; injection >=90% prevention / <=5% FP; perf p95 <=200ms/4KiB warm.
 - [ ] Cold startup + concurrency-4 measured on recorded hardware — stub cold ~13ms import; Presidio-model cold + concurrency-4 NOT measured.
@@ -15,7 +15,7 @@ Status: DRAFT — provisional, pending owner acceptance of targets and ADRs.
 
 ## Known deviations from PRD provisional budgets
 
-- Warm p95 on this host (stub detector): ~423ms @512B / ~502ms @4KiB — EXCEEDS provisional p95 <=200ms/4KiB. Live Presidio timing not yet measured; budget revision or optimization required before release claim.
+- Warm p95 on this host (live Presidio, engine cached after review-01 fix): 14.0ms @512B, 109.3ms @4KiB — within provisional p95 <=200ms/4KiB. Prior 423/502ms readings were caused by per-call AnalyzerEngine construction (measured 434ms each) and are superseded by `reports/evaluation/review01-postfix/`.
 - No real model run: end-to-end attack prevention UNMEASURED (detector metrics only).
 
 ## Change policy
