@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Record approved versions and required local resources without claiming compatibility until installed.
-- [ ] Design five synthetic boundary cases and label expected outcomes by hand.
-- [ ] Verify the clean environment and record exact results, then review the threat map.
+- [x] Record approved versions and required local resources without claiming compatibility until installed.
+- [x] Design five synthetic boundary cases and label expected outcomes by hand.
+- [x] Verify the clean environment and record exact results, then review the threat map.
 
 ## Tests and verification
 
@@ -53,5 +53,7 @@ Distinguish data provenance, model licensing and threat boundaries. Read the cor
 Which assumptions invalidate the security claim? How does a local library differ from a gateway?
 
 ## Review gate and evidence record
+
+Branch: `phase-00-contract-environment` → PR into `main`. One branch + one PR per phase.
 
 A reviewer checks scoped changes, failure evidence and privacy. Owner accepts any changed requirement or ADR. Evidence record at execution: date, commit, commands, actual results, policy/model versions, reviewer, limitations and rollback action. Roll back the phase change as a unit if its security contract regresses; never disable mandatory checks to pass. Only then mark COMPLETE and unlock the next phase.
