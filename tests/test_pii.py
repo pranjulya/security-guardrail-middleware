@@ -186,7 +186,7 @@ def test_residual_pii_blocks_with_no_text():
     assert reasons == (ReasonCode.RESIDUAL_PII,)
 
 
-def test_replacements_apply_high_to_low_offsets():
+def test_multiple_separate_replacements():
     text = "aa bb cc"
 
     def detector(t, lang, entities):
@@ -212,3 +212,42 @@ def test_real_presidio_email_and_card_redact():
     out, action, _ = r.redact("Card 4111 1111 1111 1111 ok")
     assert out == "Card [CREDIT_CARD] ok"
     assert action is Action.REDACT
+
+
+def test_nested_spans_union_with_stale_index_guard():
+    text = "0000000000xxxx"
+
+    def detector(t, lang, entities):
+        if "[CREDIT_CARD]" in t:
+            return []
+        return [
+            span("CREDIT_CARD", 0, 10, 1.0),
+            span("PERSON", 1, 2, 0.9),
+            span("PERSON", 3, 4, 0.9),
+        ]
+
+    out, action, _ = redactor(detector).redact(text)
+    assert out == "[CREDIT_CARD]xxxx"
+    assert "0000000000" not in out
+    assert action is Action.REDACT
+
+
+def test_adjacent_spans_stay_separate_with_own_labels():
+    text = "a@b.co415-555-0132"
+
+    def detector(t, lang, entities):
+        if "[" in t:
+            return []
+        return [span("EMAIL_ADDRESS", 0, 6, 1.0), span("PHONE_NUMBER", 6, 18, 0.9)]
+
+    out, action, _ = redactor(detector).redact(text)
+    assert out == "[EMAIL_ADDRESS][PHONE_NUMBER]"
+    assert action is Action.REDACT
+
+
+def test_presidio_engine_cached_across_calls():
+    from guardrails.pii import _get_engine
+
+    first = _get_engine()
+    second = _get_engine()
+    assert first is second
