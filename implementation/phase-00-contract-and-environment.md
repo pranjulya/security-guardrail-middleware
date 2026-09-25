@@ -1,6 +1,6 @@
 # Phase 00 — Contract and environment
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (repo wired 2026-09-25; env baseline implemented, threat review proposed)
 
 ## Goal
 
