@@ -16,7 +16,8 @@ Date: 2026-09-25. Machine: darwin arm64, local dev host.
 | pytest | 8.4.2 (PyPI) | MIT |
 
 Presidio supported Python per docs: 3.10/3.11/3.12/3.13. System Python 3.9.6 is NOT used.
-Install: `python3.12 -m venv .venv && .venv/bin/pip install -e ".[test]" && .venv/bin/python -m spacy download en_core_web_lg`
+Install: `python3.12 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/python -m spacy download en_core_web_lg`
+Clean-install reproduction (this host, 2026-09-25): `pip install -e .` OK after adding explicit `[tool.setuptools.packages.find]` (auto-discovery refused flat layout with no packages yet); `pytest --collect-only` → 0 items, no errors.
 
 ## Verified results
 

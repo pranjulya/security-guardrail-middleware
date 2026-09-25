@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Record approved versions and required local resources without claiming compatibility until installed.
-- [ ] Design five synthetic boundary cases and label expected outcomes by hand.
-- [ ] Verify the clean environment and record exact results, then review the threat map.
+- [x] Record approved versions and required local resources without claiming compatibility until installed.
+- [x] Design five synthetic boundary cases and label expected outcomes by hand.
+- [x] Verify the clean environment and record exact results, then review the threat map.
 
 ## Tests and verification
 
