@@ -159,7 +159,7 @@ def load_policy(data: Any) -> PolicySnapshot:
 DEFAULT_POLICY = {
     "version": "v1",
     "entities": sorted(APPROVED_ENTITIES),
-    "thresholds": {e: 0.5 for e in sorted(APPROVED_ENTITIES)},
+    "thresholds": {e: (0.4 if e == "PHONE_NUMBER" else 0.5) for e in sorted(APPROVED_ENTITIES)},
     "rules": [
         {"id": "block-direct-override", "action": "BLOCK"},
         {"id": "block-exfiltration", "action": "BLOCK"},
