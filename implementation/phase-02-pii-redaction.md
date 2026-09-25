@@ -1,6 +1,6 @@
 # Phase 02 — PII redaction
 
-Status: IN_PROGRESS (implemented on branch `phase-02-pii-redaction`, tests passing)
+Status: TESTED (14 PII checks recorded passing incl. live Presidio; blocking: held-out per-category metrics pending phase 05)
 
 ## Goal
 

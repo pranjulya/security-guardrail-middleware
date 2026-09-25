@@ -1,6 +1,6 @@
 # Phase 04 — Buffered end-to-end integration
 
-Status: IN_PROGRESS (implemented on branch `phase-04-buffered-integration`, tests passing)
+Status: TESTED (12 pipeline checks recorded passing incl. zero-release paths; blocking: owner acceptance pending)
 
 ## Goal
 
