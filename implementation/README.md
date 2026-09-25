@@ -1,6 +1,6 @@
 # Phase execution index
 
-Planning delivery only. All phases NOT_STARTED. Read the master Definition of Done and global constraints before starting.
+Phase execution index. Phases 00–05 TESTED, 06 IMPLEMENTED (see master table for blockers). Read the master Definition of Done and global constraints before starting.
 
 | Phase | Depends on | Deliverable |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Phase 05 — Evaluation and release evidence
 
-Status: IN_PROGRESS (implemented on branch `phase-05-evaluation-release`; dev-eval evidence recorded, held-out NOT RUN)
+Status: TESTED (9 invariants + dev-eval report recorded passing; blocking: held-out corpora, attack prevention, concurrency-4, rollback drill NOT RUN)
 
 ## Goal
 
