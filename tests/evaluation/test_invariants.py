@@ -42,7 +42,7 @@ def env(**overrides):
         "language": "en",
         "text": "hello",
         "request_id": "req-1",
-        "policy_id": POLICY.version,
+        "policy_id": POLICY.policy_id,
     }
     data.update(overrides)
     return data

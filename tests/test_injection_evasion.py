@@ -141,7 +141,7 @@ def test_pipeline_maps_scan_limit_to_block_limit_exceeded() -> None:
             "language": "en",
             "text": "\ufdfa" * 5000,
             "request_id": "r",
-            "policy_id": POLICY.version,
+            "policy_id": POLICY.policy_id,
         }
     )
     assert decision.action is Action.BLOCK

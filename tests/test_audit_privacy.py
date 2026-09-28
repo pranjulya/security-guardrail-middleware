@@ -33,7 +33,7 @@ def env(**kw: object) -> dict:
         "language": "en",
         "text": "hello",
         "request_id": "r1",
-        "policy_id": POLICY.version,
+        "policy_id": POLICY.policy_id,
     }
     data.update(kw)
     return data

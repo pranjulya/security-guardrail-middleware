@@ -44,7 +44,7 @@ def test_bad_scores_fail_closed(score: object) -> None:
             "language": "en",
             "text": "Alice says hi",
             "request_id": "r1",
-            "policy_id": POLICY.version,
+            "policy_id": POLICY.policy_id,
         }
     )
     assert decision.action is Action.BLOCK

@@ -8,6 +8,7 @@ import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 
 from .contracts import (
@@ -37,7 +38,7 @@ class PolicySnapshot:
     version: str
     digest: str
     entities: frozenset[str]
-    thresholds: dict[str, float]
+    thresholds: Mapping[str, float]
     rules: tuple[str, ...]
     max_text_bytes: int = MAX_TEXT_BYTES
     max_aggregate_bytes: int = MAX_AGGREGATE_BYTES
@@ -47,6 +48,11 @@ class PolicySnapshot:
 
     def allows_entity(self, entity: str) -> bool:
         return entity in self.entities
+
+    @property
+    def policy_id(self) -> str:
+        """Version@digest[:16] — the binding hosts must put in envelopes (M4)."""
+        return f"{self.version}@{self.digest[:16]}"
 
 
 def _digest(canonical: str) -> str:
@@ -172,7 +178,7 @@ def _load_policy(data: Any) -> PolicySnapshot:
         version=version,
         digest=_digest(canonical),
         entities=frozenset(entities),
-        thresholds=clean_thresholds,
+        thresholds=MappingProxyType(clean_thresholds),
         rules=tuple(sorted(seen_ids)),
         max_text_bytes=max_text_bytes,
         max_aggregate_bytes=max_aggregate_bytes,

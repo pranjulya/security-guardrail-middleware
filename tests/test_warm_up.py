@@ -125,7 +125,7 @@ def test_live_presidio_first_request_after_warm_up_is_not_deadline_blocked(monke
             "language": "en",
             "text": "mail jane.doe@example.com",
             "request_id": "first",
-            "policy_id": POLICY.version,
+            "policy_id": POLICY.policy_id,
         }
     )
     assert ReasonCode.DEADLINE_EXCEEDED not in decision.reason_codes

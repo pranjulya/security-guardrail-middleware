@@ -343,7 +343,7 @@ class _Handler(BaseHTTPRequestHandler):
                     "language": data["language"],
                     "text": data["text"],
                     "request_id": request_id,
-                    "policy_id": pipeline.policy.version,
+                    "policy_id": pipeline.policy.policy_id,
                 }
             )
         finally:

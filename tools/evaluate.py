@@ -86,7 +86,7 @@ def timing_stats(pipeline_factory, sizes=(512, 4096), repeats=200, warmups=20) -
                     "language": "en",
                     "text": text,
                     "request_id": "warm",
-                    "policy_id": pipe.policy.version,
+                    "policy_id": pipe.policy.policy_id,
                 }
             )
         samples = []
@@ -99,7 +99,7 @@ def timing_stats(pipeline_factory, sizes=(512, 4096), repeats=200, warmups=20) -
                     "language": "en",
                     "text": text,
                     "request_id": f"t{i}",
-                    "policy_id": pipe.policy.version,
+                    "policy_id": pipe.policy.policy_id,
                 }
             )
             samples.append((time.perf_counter() - start) * 1000)

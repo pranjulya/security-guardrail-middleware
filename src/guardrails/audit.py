@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from .contracts import Action, Boundary, ReasonCode, is_valid_request_id
+from .contracts import Action, Boundary, ReasonCode, is_valid_policy_id, is_valid_request_id
 
 _ALLOWED_KEYS = frozenset(
     {
@@ -24,6 +24,7 @@ _ALLOWED_KEYS = frozenset(
         "reason_codes",
         "rule_ids",
         "policy_version",
+        "policy_id",
         "detector_versions",
         "elapsed_ms",
         "byte_bucket",
@@ -80,6 +81,7 @@ class InspectionEvent:
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
     byte_bucket: str = ""
+    policy_id: str = ""
 
     def __post_init__(self) -> None:
         # Defence in depth: refuse to construct an event that could carry
@@ -118,6 +120,7 @@ class InspectionEvent:
             "elapsed_ms",
         )
         _check(self.byte_bucket in _BUCKET_LABELS | {""}, "byte_bucket")
+        _check(self.policy_id == "" or is_valid_policy_id(self.policy_id), "policy_id")
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -127,6 +130,7 @@ class InspectionEvent:
             "reason_codes": list(self.reason_codes),
             "rule_ids": list(self.rule_ids),
             "policy_version": self.policy_version,
+            "policy_id": self.policy_id,
             "detector_versions": dict(self.detector_versions),
             "elapsed_ms": self.elapsed_ms,
             "byte_bucket": self.byte_bucket,
@@ -145,6 +149,7 @@ def build_event(
     action: Any,
     reason_codes: Any,
     policy_version: str,
+    policy_id: str = "",
     detector_versions: Mapping[str, str] | None = None,
     elapsed_ms: int = 0,
     text_byte_len: int = 0,
@@ -160,6 +165,7 @@ def build_event(
         reason_codes=tuple(codes),
         rule_ids=tuple(rules),
         policy_version=policy_version,
+        policy_id=policy_id,
         detector_versions=dict(detector_versions or {}),
         elapsed_ms=max(0, int(elapsed_ms)),
         byte_bucket=byte_bucket(text_byte_len),

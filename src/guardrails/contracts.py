@@ -92,6 +92,8 @@ class Decision:
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
     safe_text: str | None = field(default=None, repr=False)
+    # "version@digest[:16]" of the policy that produced the decision (M4).
+    policy_id: str = ""
 
     def __post_init__(self) -> None:
         if self.action is Action.BLOCK and self.safe_text is not None:
@@ -104,6 +106,7 @@ class Decision:
             "action": self.action.value,
             "reason_codes": [r.value for r in self.reason_codes],
             "policy_version": self.policy_version,
+            "policy_id": self.policy_id,
             "detector_versions": dict(self.detector_versions),
             "elapsed_ms": self.elapsed_ms,
         }

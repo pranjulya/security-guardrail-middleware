@@ -6,7 +6,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .audit import build_event, safe_boundary, safe_request_id
@@ -23,7 +23,7 @@ from .contracts import (
 from .injection import InjectionScanLimit
 from .injection import detect as detect_injection
 from .pii import DetectorFailure, PiiRedactor
-from .policy import PolicySnapshot
+from .policy import PolicyError, PolicySnapshot
 
 SAFE_REFUSAL = "Cannot safely process this request."
 
@@ -46,12 +46,33 @@ class Pipeline:
     def __post_init__(self) -> None:
         if self.max_tracked_requests <= 0:
             raise ValueError("max_tracked_requests must be positive")
+        # The policy is authoritative (review 02, M4): a redactor whose
+        # entities/thresholds disagree with the policy must not be able to
+        # release text while decisions claim that policy's version and digest.
+        if self.redactor.entities != self.policy.entities or dict(self.redactor.thresholds) != dict(
+            self.policy.thresholds
+        ):
+            raise PolicyError()
         self.sink_failures = 0
         # Per-request state, keyed by request_id. Never shared between
         # different request IDs; guarded by locks so a Pipeline can be used from
         # many threads at once.
         self._states: OrderedDict[str, _RequestState] = OrderedDict()
         self._states_lock = threading.Lock()
+
+    @classmethod
+    def from_policy(
+        cls,
+        policy: PolicySnapshot,
+        detector: Any = None,
+        **kw: Any,
+    ) -> Pipeline:
+        """Build a Pipeline whose redactor is bound to ``policy`` (M4)."""
+        return cls(
+            policy=policy,
+            redactor=PiiRedactor.from_policy(policy, detector=detector),
+            **kw,
+        )
 
     def warm_up(self) -> int:
         """Load models and exercise every stage once; returns elapsed ms.
@@ -141,7 +162,9 @@ class Pipeline:
             )
         state = self._state_for(envelope.request_id)
         byte_len = envelope.text_byte_len
-        if envelope.policy_id != self.policy.version:
+        # policy_id binds version *and* digest ("v1.1@<16 hex>"), so a policy
+        # whose content drifted without a version bump is refused (M4).
+        if envelope.policy_id != self.policy.policy_id:
             return self._finish(
                 self._block((ReasonCode.POLICY_INVALID,), start),
                 boundary,
@@ -327,7 +350,7 @@ class Pipeline:
                 "language": "en",
                 "text": full,
                 "request_id": request_id,
-                "policy_id": self.policy.version,
+                "policy_id": self.policy.policy_id,
             }
         )
 
@@ -361,6 +384,8 @@ class Pipeline:
         request_id: str,
         rule_ids: tuple[str, ...],
     ) -> Decision:
+        if not decision.policy_id:
+            decision = replace(decision, policy_id=self.policy.policy_id)
         if self.event_sink is None:
             return decision
         try:
@@ -378,6 +403,7 @@ class Pipeline:
                 policy_version=decision.policy_version,
                 detector_versions=decision.detector_versions,
                 elapsed_ms=decision.elapsed_ms,
+                policy_id=decision.policy_id,
             )
             try:
                 self._emit(blocked, boundary, text_byte_len, request_id, rule_ids)
@@ -403,6 +429,7 @@ class Pipeline:
             action=decision.action,
             reason_codes=decision.reason_codes,
             policy_version=decision.policy_version,
+            policy_id=decision.policy_id,
             detector_versions=decision.detector_versions,
             elapsed_ms=decision.elapsed_ms,
             text_byte_len=text_byte_len,

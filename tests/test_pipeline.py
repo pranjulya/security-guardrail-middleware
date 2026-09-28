@@ -40,7 +40,7 @@ def env(**overrides):
         "language": "en",
         "text": "hello world",
         "request_id": "req-1",
-        "policy_id": POLICY.version,
+        "policy_id": POLICY.policy_id,
     }
     data.update(overrides)
     return data
@@ -199,6 +199,7 @@ def test_event_sink_receives_content_free_events_with_rule_ids():
             "reason_codes",
             "rule_ids",
             "policy_version",
+            "policy_id",
             "detector_versions",
             "elapsed_ms",
             "byte_bucket",

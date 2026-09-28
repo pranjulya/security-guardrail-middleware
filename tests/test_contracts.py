@@ -129,6 +129,8 @@ def test_policy_snapshot_immutable_and_versioned():
     assert first.version == "v1.1"
     with pytest.raises(AttributeError):
         first.version = "v2"
+    with pytest.raises(TypeError):  # review 02 M4: thresholds are read-only too
+        first.thresholds["PERSON"] = 0.99  # type: ignore[index]
 
 
 def test_event_serializer_allowlisted_and_canary_free(caplog):
@@ -148,6 +150,7 @@ def test_event_serializer_allowlisted_and_canary_free(caplog):
     assert set(payload) <= {
         "request_id",
         "boundary",
+        "policy_id",
         "action",
         "reason_codes",
         "rule_ids",

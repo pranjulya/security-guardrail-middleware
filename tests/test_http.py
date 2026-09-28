@@ -242,7 +242,7 @@ def test_decision_parity_with_library(server):
             "language": "en",
             "text": text,
             "request_id": "lib",
-            "policy_id": POLICY.version,
+            "policy_id": POLICY.policy_id,
         }
     )
     status, http_payload = request(

@@ -27,7 +27,7 @@ def env(request_id: str, text: str = "hello", policy=POLICY):
         "language": "en",
         "text": text,
         "request_id": request_id,
-        "policy_id": policy.version,
+        "policy_id": policy.policy_id,
     }
 
 

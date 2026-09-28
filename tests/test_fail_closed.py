@@ -39,7 +39,7 @@ def env(**kw):
         "language": "en",
         "text": "hello",
         "request_id": "r1",
-        "policy_id": POLICY.version,
+        "policy_id": POLICY.policy_id,
     }
     data.update(kw)
     return data
@@ -188,7 +188,7 @@ def test_fuzz_inspect_and_collect_are_total():
                 {
                     "boundary": "user_input",
                     "language": "en",
-                    "policy_id": POLICY.version,
+                    "policy_id": POLICY.policy_id,
                 }
             )
         decision = pipeline.inspect(envelope)
