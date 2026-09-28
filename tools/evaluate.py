@@ -18,7 +18,9 @@ import json
 import math
 import platform
 import statistics
-import subprocess
+
+# subprocess only re-runs our own interpreter with fixed code (cold start).
+import subprocess  # nosec B404
 import sys
 import threading
 import time
@@ -337,7 +339,8 @@ def cold_start() -> dict[str, Any]:
     """Fresh interpreters: first inspect without and with warm_up()."""
     out: dict[str, Any] = {}
     for label, warm in (("no_warm_up", False), ("with_warm_up", True)):
-        result = subprocess.run(  # noqa: S603 - fixed code, our own interpreter
+        # Fixed code, our own interpreter, no shell, no untrusted input.
+        result = subprocess.run(  # noqa: S603  # nosec B603
             [sys.executable, "-c", f"WARM = {warm}\n" + _COLD_CODE],
             check=True,
             capture_output=True,

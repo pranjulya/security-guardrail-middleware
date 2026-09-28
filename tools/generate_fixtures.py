@@ -713,7 +713,8 @@ def generate(out_dir: Path) -> dict[str, int]:
     out_dir.mkdir(parents=True, exist_ok=True)
     counts = {}
     for name, gen in GENERATORS.items():
-        rng = random.Random(f"{SEED}:{name}")
+        # Reproducible synthetic test data, not cryptography.
+        rng = random.Random(f"{SEED}:{name}")  # nosec B311
         records = gen(rng)
         with (out_dir / name).open("w", encoding="utf-8", newline="\n") as fh:
             for r in records:
