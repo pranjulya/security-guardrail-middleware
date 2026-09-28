@@ -35,6 +35,80 @@ from .tools import (
 
 SAFE_REFUSAL = "Cannot safely process this request."
 
+#: Upper bound on detector threads alive at once, including abandoned ones
+#: whose deadline already expired (review 02, M6).
+MAX_DETECTOR_THREADS = 16
+
+
+class _DetectorDeadline(Exception):
+    """The detector did not finish within the request's remaining budget."""
+
+
+class DetectorRunner:
+    """Run the PII detector with a pre-emptive deadline.
+
+    Each call runs on a short-lived *daemon* thread and the caller waits at most
+    the request's remaining budget. On timeout the caller gets a BLOCK
+    (DEADLINE_EXCEEDED) immediately; the abandoned thread's eventual result is
+    discarded, so nothing is ever released late. Python threads cannot be
+    killed, so a hung detector keeps its thread (and slot) until it returns; at
+    most ``max_threads`` detector threads may exist. A caller waits for a free
+    slot only within its own remaining budget, then fails closed with
+    DETECTOR_ERROR.
+    Daemon threads never block interpreter shutdown.
+    """
+
+    def __init__(self, max_threads: int = MAX_DETECTOR_THREADS) -> None:
+        if type(max_threads) is not int or max_threads <= 0:
+            raise ValueError("max_threads must be a positive int")
+        self.max_threads = max_threads
+        self._slots = threading.BoundedSemaphore(max_threads)
+        self._lock = threading.Lock()
+        self.timeouts = 0
+        self.saturated = 0
+
+    def run(self, fn: Callable[[str], Any], text: str, timeout_s: float) -> Any:
+        if timeout_s <= 0:
+            raise _DetectorDeadline()
+        deadline = time.monotonic() + timeout_s
+        # Wait for a slot only within the request's own budget; if every slot
+        # is still held (e.g. by hung detectors) fail closed.
+        if not self._slots.acquire(timeout=timeout_s):
+            with self._lock:
+                self.saturated += 1
+            raise DetectorFailure()
+        box: dict[str, Any] = {}
+        done = threading.Event()
+
+        def target() -> None:
+            try:
+                box["value"] = fn(text)
+            except BaseException as exc:  # noqa: BLE001 - re-raised in caller
+                box["error"] = exc
+            finally:
+                # Release the slot *before* waking the caller so back-to-back
+                # calls from one thread never see a spurious saturation.
+                self._slots.release()
+                done.set()
+
+        try:
+            threading.Thread(target=target, name="guardrail-detector", daemon=True).start()
+        except BaseException:
+            self._slots.release()
+            raise
+        if not done.wait(max(0.0, deadline - time.monotonic())):
+            with self._lock:
+                self.timeouts += 1
+            raise _DetectorDeadline()
+        if "error" in box:
+            raise box["error"]
+        return box["value"]
+
+
+#: Process-wide runner shared by every Pipeline (HTTP builds one per request,
+#: so the thread bound must not be per-Pipeline).
+DETECTOR_RUNNER = DetectorRunner()
+
 EventSink = Callable[[dict[str, Any]], None]
 
 
@@ -48,6 +122,10 @@ class Pipeline:
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     event_sink: EventSink | None = None
     max_tool_invocations: int = 1
+    #: Enforce the deadline *while* the PII detector runs (M6). When False the
+    #: detector runs inline and the deadline is checked only after it returns.
+    preemptive_deadline: bool = True
+    detector_runner: DetectorRunner | None = None
 
     max_tracked_requests: int = 4096
 
@@ -237,7 +315,22 @@ class Pipeline:
             )
         redact_start = self.clock_ms()
         try:
-            safe_text, action, _ = self.redactor.redact(envelope.text)
+            if self.preemptive_deadline:
+                runner = self.detector_runner or DETECTOR_RUNNER
+                safe_text, action, _ = runner.run(
+                    self.redactor.redact, envelope.text, state.remaining() / 1000.0
+                )
+            else:
+                safe_text, action, _ = self.redactor.redact(envelope.text)
+        except _DetectorDeadline:
+            state.expire()
+            return self._finish(
+                self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
+            )
         except DetectorFailure:
             return self._finish(
                 self._block((ReasonCode.DETECTOR_ERROR,), start),
@@ -356,6 +449,9 @@ class Pipeline:
             )
         buffered: list[str] = []
         total = 0
+        # Collection time counts against the request's inspection budget (M6):
+        # a slow stream is blocked as soon as the budget runs out, not after.
+        state = self._state_for(request_id)
         _, bytes_used = self.request_usage(request_id)
         per_text_cap = min(
             self.policy.max_text_bytes,
@@ -396,6 +492,15 @@ class Pipeline:
                     (),
                 )
             buffered.append(chunk)
+            if self.clock_ms() - start > state.remaining():
+                state.expire()
+                return self._finish(
+                    self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
+                    "model_output",
+                    total,
+                    request_id,
+                    (),
+                )
         full = "".join(buffered)
         if not full.strip():
             return self._finish(
@@ -405,15 +510,16 @@ class Pipeline:
                 request_id,
                 (),
             )
-        return self.inspect(
-            {
-                "boundary": "model_output",
-                "language": "en",
-                "text": full,
-                "request_id": request_id,
-                "policy_id": self.policy.policy_id,
-            }
-        )
+        envelope = {
+            "boundary": "model_output",
+            "language": "en",
+            "text": full,
+            "request_id": request_id,
+            "policy_id": self.policy.policy_id,
+        }
+        # Inspect with the *collection* start so elapsed_ms and the budget
+        # debit include the time spent waiting for the stream.
+        return self._inspect(envelope, start)
 
     def _versions(self) -> dict[str, str]:
         versions = dict(self.detector_versions)
@@ -509,6 +615,14 @@ class _RequestState:
     def consume(self, byte_len: int) -> None:
         with self.lock:
             self.budget.consume(byte_len)
+
+    def remaining(self) -> int:
+        with self.lock:
+            return self.remaining_ms
+
+    def expire(self) -> None:
+        with self.lock:
+            self.remaining_ms = min(self.remaining_ms, -1)
 
     def debit(self, elapsed_ms: int) -> bool:
         """Charge elapsed time; True once the request's budget is exhausted."""
