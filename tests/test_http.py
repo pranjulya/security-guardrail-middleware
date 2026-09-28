@@ -10,7 +10,6 @@ import time
 
 import pytest
 
-from guardrails.contracts import Action, ReasonCode
 from guardrails.http import MAX_WIRE_BYTES, ServerConfig, create_server
 from guardrails.pii import DetectorFailure, PiiRedactor
 from guardrails.pipeline import Pipeline
@@ -65,6 +64,17 @@ def request(server, method, path, body=None, token=TOKEN, raw: bytes | None = No
     data = response.read()
     conn.close()
     return response.status, (json.loads(data) if data else None)
+
+
+def _recv_all(sock: socket.socket) -> bytes:
+    # The response may arrive in several TCP segments (headers, then body);
+    # read until the server closes the connection instead of a single recv().
+    data = b""
+    while True:
+        chunk = sock.recv(4096)
+        if not chunk:
+            return data
+        data += chunk
 
 
 @pytest.fixture
@@ -136,7 +146,7 @@ def test_oversize_wire_body_413_before_parsing(server):
         f"\r\n"
     )
     conn.sendall(headers.encode())
-    response = conn.recv(4096).decode()
+    response = _recv_all(conn).decode()
     conn.close()
     assert "413" in response
     assert "BODY_TOO_LARGE" in response
