@@ -40,8 +40,6 @@ def _serve(server):
 
 
 def test_engine_is_created_exactly_once_under_concurrency(monkeypatch):
-    import presidio_analyzer
-
     created = []
 
     class FakeEngine:
@@ -49,7 +47,7 @@ def test_engine_is_created_exactly_once_under_concurrency(monkeypatch):
             time.sleep(0.2)
             created.append(self)
 
-    monkeypatch.setattr(presidio_analyzer, "AnalyzerEngine", FakeEngine)
+    monkeypatch.setattr(pii, "_build_engine", FakeEngine)
     monkeypatch.setattr(pii, "_ENGINE", None)
     engines = []
     threads = [threading.Thread(target=lambda: engines.append(pii._get_engine())) for _ in range(8)]

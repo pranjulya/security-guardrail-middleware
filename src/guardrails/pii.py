@@ -67,6 +67,52 @@ WARM_UP_TEXT = (
 )
 
 
+_TLD_EXTRACTOR: Any = None
+
+
+def offline_tld_extractor() -> Any:
+    """tldextract using only the bundled Public Suffix List snapshot.
+
+    Presidio's e-mail recognizer calls ``tldextract.extract``, whose default
+    instance downloads the PSL from publicsuffix.org on first use and caches it
+    on disk (review 02, L2: runtime egress + supply-chain input). This instance
+    never touches the network or the disk.
+    """
+    global _TLD_EXTRACTOR
+    if _TLD_EXTRACTOR is None:
+        import tldextract
+
+        _TLD_EXTRACTOR = tldextract.TLDExtract(
+            suffix_list_urls=(), cache_dir=None, fallback_to_snapshot=True
+        )
+    return _TLD_EXTRACTOR
+
+
+def _build_engine() -> Any:
+    """AnalyzerEngine with a registry restricted to the recognizers we use."""
+    from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+    from presidio_analyzer.predefined_recognizers import (
+        CreditCardRecognizer,
+        EmailRecognizer,
+        PhoneRecognizer,
+        SpacyRecognizer,
+    )
+
+    class OfflineEmailRecognizer(EmailRecognizer):
+        def validate_result(self, pattern_text: str) -> bool:
+            return bool(offline_tld_extractor()(pattern_text).fqdn != "")
+
+    registry = RecognizerRegistry(supported_languages=["en"])
+    for recognizer in (
+        SpacyRecognizer(supported_language="en"),
+        OfflineEmailRecognizer(),
+        PhoneRecognizer(),
+        CreditCardRecognizer(),
+    ):
+        registry.add_recognizer(recognizer)
+    return AnalyzerEngine(registry=registry, supported_languages=["en"])
+
+
 def _get_engine() -> Any:
     """Return the process-wide AnalyzerEngine, creating it exactly once."""
     global _ENGINE
@@ -75,9 +121,7 @@ def _get_engine() -> Any:
         return engine
     with _ENGINE_LOCK:
         if _ENGINE is None:
-            from presidio_analyzer import AnalyzerEngine
-
-            _ENGINE = AnalyzerEngine()
+            _ENGINE = _build_engine()
             quiet_detector_loggers()  # in case the import reconfigured them
         return _ENGINE
 
