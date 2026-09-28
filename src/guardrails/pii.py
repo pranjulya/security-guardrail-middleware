@@ -33,10 +33,19 @@ MAX_NORMALIZED_CHARS = 64 * 1024
 # dot, dash, slash, underscore; Luhn-validated by the card recognizer.
 _CARD_SEPARATORS = (" ", "\t", "\r", "\n", ".", "-", "/", "_")
 _CARD_PATTERN = r"(?<![\w.])(?:\d[ \t\r\n./_-]{0,2}){12,18}\d(?!\w)"
-_AT = r"\s*(?:\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|<\s*at\s*>)\s*"
-_DOT = r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|<\s*dot\s*>|\.)\s*"
+_SP = r"[ \t]{0,3}"  # bounded horizontal whitespace
+_BRACKETS = ((r"\[", r"\]"), (r"\(", r"\)"), (r"\{", r"\}"), ("<", ">"))
+_AT = _SP + "(?:" + "|".join(o + _SP + "at" + _SP + c for o, c in _BRACKETS) + ")" + _SP
+_DOT = _SP + "(?:" + "|".join(o + _SP + "dot" + _SP + c for o, c in _BRACKETS) + r"|\." + ")" + _SP
+# Every quantifier is bounded (RFC 5321 local part <= 64, label <= 63, <= 10
+# labels) so the pattern stays linear on adversarial input such as
+# "a.a.a...": an unbounded local part made 16 KiB of "a." take >3 s (ReDoS).
 _OBFUSCATED_EMAIL_PATTERN = (
-    r"\b[A-Za-z0-9._%+-]+" + _AT + r"[A-Za-z0-9-]+(?:" + _DOT + r"[A-Za-z0-9-]+)+\b"
+    r"\b[A-Za-z0-9._%+-]{1,64}"
+    + _AT
+    + r"[A-Za-z0-9-]{1,63}(?:"
+    + _DOT
+    + r"[A-Za-z0-9-]{1,63}){1,10}\b"
 )
 _SECRET_PATTERNS = (
     ("aws-access-key", r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),

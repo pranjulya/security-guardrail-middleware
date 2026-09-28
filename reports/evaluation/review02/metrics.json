@@ -3,7 +3,7 @@
     "no_warm_up": {
       "action": "BLOCK",
       "first_inspect_ms": 2000,
-      "import_ms": 73,
+      "import_ms": 70,
       "reason_codes": [
         "DEADLINE_EXCEEDED"
       ],
@@ -12,27 +12,27 @@
     "with_warm_up": {
       "action": "ALLOW",
       "first_inspect_ms": 6,
-      "import_ms": 63,
+      "import_ms": 60,
       "reason_codes": [],
-      "warm_up_ms": 2219
+      "warm_up_ms": 2160
     }
   },
   "concurrency": {
     "4": {
-      "max_ms": 441.66,
-      "mean_ms": 361.02,
+      "max_ms": 378.33,
+      "mean_ms": 339.82,
       "n": 40,
-      "p50_ms": 355.32,
-      "p95_ms": 431.11,
-      "p99_ms": 441.66
+      "p50_ms": 334.99,
+      "p95_ms": 367.81,
+      "p99_ms": 378.33
     },
     "8": {
-      "max_ms": 846.15,
-      "mean_ms": 774.6,
+      "max_ms": 878.0,
+      "mean_ms": 762.95,
       "n": 80,
-      "p50_ms": 777.72,
-      "p95_ms": 836.17,
-      "p99_ms": 846.15
+      "p50_ms": 760.36,
+      "p95_ms": 862.82,
+      "p99_ms": 878.0
     }
   },
   "false_positives": {
@@ -333,52 +333,52 @@
   },
   "performance": {
     "benign@16384B": {
-      "max_ms": 349.52,
-      "mean_ms": 312.35,
+      "max_ms": 360.88,
+      "mean_ms": 306.37,
       "n": 30,
-      "p50_ms": 309.75,
-      "p95_ms": 344.26,
-      "p99_ms": 349.52
+      "p50_ms": 301.92,
+      "p95_ms": 338.56,
+      "p99_ms": 360.88
     },
     "benign@4096B": {
-      "max_ms": 78.8,
-      "mean_ms": 72.69,
+      "max_ms": 119.05,
+      "mean_ms": 74.1,
       "n": 30,
-      "p50_ms": 72.33,
-      "p95_ms": 78.43,
-      "p99_ms": 78.8
+      "p50_ms": 71.26,
+      "p95_ms": 87.6,
+      "p99_ms": 119.05
     },
     "benign@512B": {
-      "max_ms": 97.32,
-      "mean_ms": 17.01,
+      "max_ms": 79.97,
+      "mean_ms": 16.0,
       "n": 30,
-      "p50_ms": 13.32,
-      "p95_ms": 24.37,
-      "p99_ms": 97.32
+      "p50_ms": 13.02,
+      "p95_ms": 18.28,
+      "p99_ms": 79.97
     },
     "pii-dense@16384B": {
-      "max_ms": 1440.41,
-      "mean_ms": 1154.86,
+      "max_ms": 1262.77,
+      "mean_ms": 1116.59,
       "n": 30,
-      "p50_ms": 1127.4,
-      "p95_ms": 1381.39,
-      "p99_ms": 1440.41
+      "p50_ms": 1106.28,
+      "p95_ms": 1167.56,
+      "p99_ms": 1262.77
     },
     "pii-dense@4096B": {
-      "max_ms": 361.93,
-      "mean_ms": 258.23,
+      "max_ms": 264.98,
+      "mean_ms": 243.95,
       "n": 30,
-      "p50_ms": 245.7,
-      "p95_ms": 340.21,
-      "p99_ms": 361.93
+      "p50_ms": 240.77,
+      "p95_ms": 262.65,
+      "p99_ms": 264.98
     },
     "pii-dense@512B": {
-      "max_ms": 63.58,
-      "mean_ms": 39.33,
+      "max_ms": 48.85,
+      "mean_ms": 38.43,
       "n": 30,
-      "p50_ms": 37.94,
-      "p95_ms": 42.04,
-      "p99_ms": 63.58
+      "p50_ms": 37.81,
+      "p95_ms": 47.46,
+      "p99_ms": 48.85
     }
   },
   "phone_person_tradeoff": {

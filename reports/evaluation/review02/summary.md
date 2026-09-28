@@ -86,22 +86,22 @@ Injection FP rate: 0/200 = 0.0000 [0.0000, 0.0188]
 
 ## Performance (warm process)
 
-- benign@512B: p50 13.32ms p95 24.37ms p99 97.32ms max 97.32ms (n=30)
-- pii-dense@512B: p50 37.94ms p95 42.04ms p99 63.58ms max 63.58ms (n=30)
-- benign@4096B: p50 72.33ms p95 78.43ms p99 78.8ms max 78.8ms (n=30)
-- pii-dense@4096B: p50 245.7ms p95 340.21ms p99 361.93ms max 361.93ms (n=30)
-- benign@16384B: p50 309.75ms p95 344.26ms p99 349.52ms max 349.52ms (n=30)
-- pii-dense@16384B: p50 1127.4ms p95 1381.39ms p99 1440.41ms max 1440.41ms (n=30)
+- benign@512B: p50 13.02ms p95 18.28ms p99 79.97ms max 79.97ms (n=30)
+- pii-dense@512B: p50 37.81ms p95 47.46ms p99 48.85ms max 48.85ms (n=30)
+- benign@4096B: p50 71.26ms p95 87.6ms p99 119.05ms max 119.05ms (n=30)
+- pii-dense@4096B: p50 240.77ms p95 262.65ms p99 264.98ms max 264.98ms (n=30)
+- benign@16384B: p50 301.92ms p95 338.56ms p99 360.88ms max 360.88ms (n=30)
+- pii-dense@16384B: p50 1106.28ms p95 1167.56ms p99 1262.77ms max 1262.77ms (n=30)
 
 ## Concurrency
 
-- concurrency 4: p50 355.32ms p95 431.11ms p99 441.66ms (n=40)
-- concurrency 8: p50 777.72ms p95 836.17ms p99 846.15ms (n=80)
+- concurrency 4: p50 334.99ms p95 367.81ms p99 378.33ms (n=40)
+- concurrency 8: p50 760.36ms p95 862.82ms p99 878.0ms (n=80)
 
 ## Cold start (fresh interpreter)
 
-- no_warm_up: import+build 73ms, warm_up skipped, first inspect 2000ms -> BLOCK DEADLINE_EXCEEDED
-- with_warm_up: import+build 63ms, warm_up 2219ms, first inspect 6ms -> ALLOW
+- no_warm_up: import+build 70ms, warm_up skipped, first inspect 2000ms -> BLOCK DEADLINE_EXCEEDED
+- with_warm_up: import+build 60ms, warm_up 2160ms, first inspect 6ms -> ALLOW
 
 ## Limits
 
