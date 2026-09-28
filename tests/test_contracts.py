@@ -159,8 +159,20 @@ def test_event_serializer_allowlisted_and_canary_free(caplog):
         "elapsed_ms",
         "byte_bucket",
     }
-    with caplog.at_level(logging.INFO):
-        logging.getLogger("guardrails").info(event.serialize())
+    assert CANARY not in event.serialize()
+    # Canary-bearing ids are replaced, never serialized (review 02, M1/M11).
+    with caplog.at_level(logging.DEBUG):
+        leaky = build_event(
+            request_id="req " + CANARY,
+            boundary=CANARY,
+            action=Action.BLOCK,
+            reason_codes=[ReasonCode.INVALID_ENVELOPE],
+            policy_version="v1",
+            detector_versions={},
+            elapsed_ms=0,
+            text_byte_len=0,
+        )
+    assert CANARY not in leaky.serialize()
     assert CANARY not in caplog.text
 
 
