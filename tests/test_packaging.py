@@ -51,3 +51,40 @@ def test_package_is_marked_typed() -> None:
     assert marker.is_file()
     assert "py.typed" in PYPROJECT["tool"]["setuptools"]["package-data"]["guardrails"]
     assert PYPROJECT["tool"]["mypy"]["strict"] is True
+
+
+LOCK = Path(__file__).resolve().parents[1] / "requirements-lock.txt"
+
+
+def _dep_names(reqs: list[str]) -> set[str]:
+    return {re.split(r"[\s=<>@\[;]", r, maxsplit=1)[0].lower() for r in reqs}
+
+
+def test_unused_vulnerable_anonymizer_dropped() -> None:
+    """M8: presidio-anonymizer was unused and pinned a vulnerable cryptography."""
+    assert "presidio-anonymizer" not in _dep_names(PYPROJECT["project"]["dependencies"])
+    src = Path(__file__).resolve().parents[1] / "src"
+    assert not any("presidio_anonymizer" in p.read_text() for p in src.rglob("*.py"))
+
+
+def test_pytest_pinned_past_advisory() -> None:
+    """M8: pytest >= 9.0.3 (CVE-2025-71176)."""
+    (pin,) = [r for r in PYPROJECT["project"]["optional-dependencies"]["test"] if "pytest" in r]
+    version = tuple(int(x) for x in pin.split("==")[1].split("#")[0].strip().split("."))
+    assert version >= (9, 0, 3)
+
+
+def test_lock_file_pins_everything_with_hashes() -> None:
+    """M8: transitive dependencies are pinned with sha256 hashes."""
+    text = LOCK.read_text()
+    entries = re.findall(r"^([A-Za-z0-9_.\-]+)(?:==| @ )", text, flags=re.M)
+    assert len(entries) >= 40
+    blocks = re.split(r"\n(?=[A-Za-z0-9])", text.split("\n", 2)[2])
+    for block in blocks:
+        if block.strip() and not block.startswith("#"):
+            assert "--hash=sha256:" in block, block.splitlines()[0]
+    names = {e.lower() for e in entries}
+    assert "presidio-anonymizer" not in names
+    assert "cryptography" not in names
+    for dep in ("presidio-analyzer==2.2.360", "spacy==3.8.16", "pytest==9.1.1"):
+        assert re.search(rf"^{re.escape(dep)} ", text, flags=re.M), dep
