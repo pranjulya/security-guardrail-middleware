@@ -14,7 +14,13 @@ MAX_BLOCKS = 4
 INSPECTION_BUDGET_MS = 2000
 SUPPORTED_LANGUAGE = "en"
 
-APPROVED_ENTITIES = frozenset({"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"})
+# Core entities enabled by the default policy (PRD scope).
+DEFAULT_ENTITIES = frozenset({"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"})
+# Opt-in entities a policy may enable (review 02, M3): not in the default
+# policy because changing its scope is an owner decision; see
+# docs/architecture/ADRs/ADR-002-pii.md.
+OPT_IN_ENTITIES = frozenset({"US_SSN", "IBAN_CODE", "SECRET_TOKEN"})
+APPROVED_ENTITIES = DEFAULT_ENTITIES | OPT_IN_ENTITIES
 
 
 # Envelope identifiers are bounded and charset-restricted so they are safe to

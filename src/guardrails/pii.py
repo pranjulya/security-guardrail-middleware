@@ -4,21 +4,69 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import threading
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from .contracts import Action, ReasonCode
 
-ENTITY_PRECEDENCE = ("CREDIT_CARD", "EMAIL_ADDRESS", "PHONE_NUMBER", "PERSON")
+ENTITY_PRECEDENCE = (
+    "SECRET_TOKEN",
+    "CREDIT_CARD",
+    "IBAN_CODE",
+    "US_SSN",
+    "EMAIL_ADDRESS",
+    "PHONE_NUMBER",
+    "PERSON",
+)
 
-REDACTION_LABELS = {
-    "CREDIT_CARD": "[CREDIT_CARD]",
-    "EMAIL_ADDRESS": "[EMAIL_ADDRESS]",
-    "PHONE_NUMBER": "[PHONE_NUMBER]",
-    "PERSON": "[PERSON]",
-}
+REDACTION_LABELS = {entity: f"[{entity}]" for entity in ENTITY_PRECEDENCE}
+
+# Detection runs on a normalised view (NFKC, format characters removed). NFKC
+# can expand a code point up to 18x; beyond this the input is refused.
+MAX_NORMALIZED_CHARS = 64 * 1024
+
+# Card numbers with any common separator (review 02, M3): space, tab, CR/LF,
+# dot, dash, slash, underscore; Luhn-validated by the card recognizer.
+_CARD_SEPARATORS = (" ", "\t", "\r", "\n", ".", "-", "/", "_")
+_CARD_PATTERN = r"(?<![\w.])(?:\d[ \t\r\n./_-]{0,2}){12,18}\d(?!\w)"
+_AT = r"\s*(?:\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|<\s*at\s*>)\s*"
+_DOT = r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|<\s*dot\s*>|\.)\s*"
+_OBFUSCATED_EMAIL_PATTERN = (
+    r"\b[A-Za-z0-9._%+-]+" + _AT + r"[A-Za-z0-9-]+(?:" + _DOT + r"[A-Za-z0-9-]+)+\b"
+)
+_SECRET_PATTERNS = (
+    ("aws-access-key", r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
+    ("stripe-key", r"\b(?:sk|rk|pk)_(?:live|test)_[0-9A-Za-z]{10,99}\b"),
+    ("github-token", r"\b(?:gh[pousr]_[0-9A-Za-z]{36,255}|github_pat_[0-9A-Za-z_]{22,255})\b"),
+    ("slack-token", r"\bxox[abposr]-[0-9A-Za-z-]{10,200}\b"),
+    ("google-api-key", r"\bAIza[0-9A-Za-z_-]{35}\b"),
+    ("openai-style-key", r"\bsk-(?:proj-)?[0-9A-Za-z_-]{20,}\b"),
+    ("jwt", r"\beyJ[0-9A-Za-z_-]{8,}\.eyJ[0-9A-Za-z_-]{8,}\.[0-9A-Za-z_-]{8,}\b"),
+    ("private-key", r"-----BEGIN (?:[A-Z]+ )*PRIVATE KEY-----"),
+)
+
+
+def normalized_with_map(text: str) -> tuple[str, list[int]]:
+    """NFKC + format-character removal, with a map back to original offsets.
+
+    ``index_map[i]`` is the original index of normalised character ``i``; a
+    normalised span ``(s, e)`` covers original ``(index_map[s], index_map[e-1]+1)``.
+    """
+    if text.isascii():
+        return text, list(range(len(text)))
+    out: list[str] = []
+    index_map: list[int] = []
+    for i, ch in enumerate(text):
+        if unicodedata.category(ch) == "Cf":  # ZWSP, ZWJ, soft hyphen, bidi controls
+            continue
+        for c in unicodedata.normalize("NFKC", ch):
+            out.append(c)
+            index_map.append(i)
+    return "".join(out), index_map
 
 
 @dataclass(frozen=True)
@@ -91,24 +139,55 @@ def offline_tld_extractor() -> Any:
 
 def _build_engine() -> Any:
     """AnalyzerEngine with a registry restricted to the recognizers we use."""
-    from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+    from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer, RecognizerRegistry
     from presidio_analyzer.predefined_recognizers import (
         CreditCardRecognizer,
         EmailRecognizer,
+        IbanRecognizer,
         PhoneRecognizer,
         SpacyRecognizer,
+        UsSsnRecognizer,
     )
 
     class OfflineEmailRecognizer(EmailRecognizer):
         def validate_result(self, pattern_text: str) -> bool:
             return bool(offline_tld_extractor()(pattern_text).fqdn != "")
 
+    class ObfuscatedEmailRecognizer(PatternRecognizer):
+        """``jane.doe [at] example [dot] com`` and similar bracketed forms."""
+
+        def validate_result(self, pattern_text: str) -> bool:
+            plain = re.sub(_AT, "@", pattern_text, flags=re.IGNORECASE)
+            plain = re.sub(_DOT, ".", plain, flags=re.IGNORECASE)
+            return bool(offline_tld_extractor()(plain.split("@")[-1]).fqdn != "")
+
+    class SeparatorTolerantCardRecognizer(CreditCardRecognizer):
+        """Card numbers split by dots, newlines, slashes, underscores (Luhn-checked)."""
+
     registry = RecognizerRegistry(supported_languages=["en"])
     for recognizer in (
         SpacyRecognizer(supported_language="en"),
         OfflineEmailRecognizer(),
+        ObfuscatedEmailRecognizer(
+            supported_entity="EMAIL_ADDRESS",
+            name="ObfuscatedEmailRecognizer",
+            patterns=[Pattern("obfuscated-email", _OBFUSCATED_EMAIL_PATTERN, 0.6)],
+        ),
         PhoneRecognizer(),
         CreditCardRecognizer(),
+        SeparatorTolerantCardRecognizer(
+            patterns=[Pattern("card-any-separator", _CARD_PATTERN, 0.3)],
+            replacement_pairs=[(sep, "") for sep in _CARD_SEPARATORS],
+        ),
+        # Opt-in entities: only analysed when a policy enables them.
+        UsSsnRecognizer(),
+        IbanRecognizer(),
+        PatternRecognizer(
+            supported_entity="SECRET_TOKEN",
+            name="SecretTokenRecognizer",
+            patterns=[Pattern(name, regex, 0.9) for name, regex in _SECRET_PATTERNS],
+            global_regex_flags=re.DOTALL | re.MULTILINE,  # case-sensitive
+        ),
     ):
         registry.add_recognizer(recognizer)
     return AnalyzerEngine(registry=registry, supported_languages=["en"])
@@ -217,8 +296,14 @@ class PiiRedactor:
 
     def _detect(self, text: str, entities: Iterable[str] | None = None) -> list[DetectedSpan]:
         wanted = list(entities) if entities is not None else sorted(self.entities)
+        # Detect on a normalised view so zero-width characters, full-width
+        # digits / at-signs and other compatibility forms cannot hide PII (M3); spans
+        # are mapped back to original offsets and the original text is redacted.
+        view, index_map = normalized_with_map(text)
+        if len(view) > MAX_NORMALIZED_CHARS:
+            raise DetectorFailure()
         try:
-            spans = self._detector(text, "en", wanted)
+            spans = self._detector(view, "en", wanted)
         except DetectorFailure:
             raise
         except Exception as exc:
@@ -230,13 +315,16 @@ class PiiRedactor:
                     continue
                 if type(s.start) is not int or type(s.end) is not int:
                     raise DetectorFailure()
-                if s.start < 0 or s.end <= s.start or s.end > len(text):
+                if s.start < 0 or s.end <= s.start or s.end > len(view):
                     raise DetectorFailure()
                 # A NaN / non-numeric / out-of-range score is a detector fault,
                 # not a silent miss (L6): fail closed.
                 if not _valid_score(s.score):
                     raise DetectorFailure()
                 if s.score >= self.thresholds[s.entity_type]:
+                    start, end = index_map[s.start], index_map[s.end - 1] + 1
+                    if (start, end) != (s.start, s.end):
+                        s = DetectedSpan(s.entity_type, start, end, s.score)
                     valid.append(s)
         except DetectorFailure:
             raise
