@@ -68,4 +68,4 @@ tests/fixtures/       # synthetic fixture conventions
 
 ## License
 
-MIT (declared in `pyproject.toml`). A root `LICENSE` file is planned to be added in a later settings pass.
+Released under the MIT License. See [`LICENSE`](LICENSE).
