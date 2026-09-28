@@ -65,3 +65,7 @@ tests/fixtures/       # synthetic fixture conventions
 
 - [PRD](docs/product/PRD.md), [HLD](docs/architecture/HLD.md), [LLD](docs/architecture/LLD.md), [ADRs](docs/architecture/ADRs/README.md)
 - [Learning guide](Learning/README.md)
+
+## License
+
+MIT (declared in `pyproject.toml`). A root `LICENSE` file is planned to be added in a later settings pass.

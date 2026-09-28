@@ -8,7 +8,7 @@ Date: 2026-09-25. Machine: darwin arm64, local dev host.
 
 | Component | Version | Origin / license |
 |---|---|---|
-| Python | 3.12.13 (`/Users/pranjulyabajpai/.local/bin/python3.12`, venv `.venv`) | python.org / PSF |
+| Python | 3.12.13 (python.org build, venv `.venv`) | python.org / PSF |
 | presidio-analyzer | 2.2.360 (PyPI) | MIT, https://github.com/Microsoft/presidio (now data-privacy-stack) |
 | presidio-anonymizer | 2.2.360 (PyPI) | MIT |
 | spacy | 3.8.16 (PyPI) | MIT, Explosion |
@@ -16,7 +16,15 @@ Date: 2026-09-25. Machine: darwin arm64, local dev host.
 | pytest | 8.4.2 (PyPI) | MIT |
 
 Presidio supported Python per docs: 3.10/3.11/3.12/3.13. System Python 3.9.6 is NOT used.
-Install: `python3.12 -m venv .venv && .venv/bin/pip install -e ".[test]" && .venv/bin/python -m spacy download en_core_web_lg`
+Install (recommended, matches the working README path):
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install "presidio-analyzer==2.2.360" "presidio-anonymizer==2.2.360" "spacy==3.8.16" "pytest==8.4.2"
+python -m spacy download en_core_web_lg
+```
+
+Note: `pip install -e ".[test]"` from `pyproject.toml` currently fails because `en-core-web-lg` is not on PyPI (install the model via `spacy download` as above) and `[tool.setuptools.packages.find] where = ["src"]` points at a `src/` tree that does not exist yet. Prefer the direct `pip install …` commands until those packaging entries are fixed.
 
 ## Verified results
 

@@ -1,6 +1,6 @@
 # Phase execution index
 
-Planning delivery only. All phases NOT_STARTED. Read the master Definition of Done and global constraints before starting.
+Planning delivery only. Phase 00 is IN_PROGRESS (environment baseline recorded; threat review pending). Phases 01–06 are NOT_STARTED. Read the master Definition of Done and global constraints before starting.
 
 | Phase | Depends on | Deliverable |
 |---|---|---|
