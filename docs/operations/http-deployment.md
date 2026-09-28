@@ -13,22 +13,25 @@ Stdlib only (`http.server`, `hmac`, `json`) — no new runtime dependency was ad
 ## Interface
 
 - `POST /v1/inspect` body `{"boundary", "language", "text"}` (unknown keys rejected). Server generates `request_id` and resolves `policy_id` server-side; callers cannot supply either.
-- Responses: `200` with public decision (`safe_text` only for ALLOW/REDACT — BLOCK has none); `400` `BAD_JSON`/`BAD_REQUEST`; `401` `UNAUTHORIZED`; `413` `BODY_TOO_LARGE` (checked against `Content-Length` before reading/parsing); `429` `SATURATED`; `503` `DETECTOR_UNAVAILABLE`; `404` `NOT_FOUND`.
-- `GET /healthz` unauthenticated, returns readiness + policy version only (no payloads).
+- Responses: `200` with public decision (`safe_text` only for ALLOW/REDACT — BLOCK has none); `400` `BAD_JSON`/`BAD_REQUEST` (incl. invalid UTF-8, escaped lone surrogates, excessive nesting); `401` `UNAUTHORIZED` (incl. non-ASCII headers); `413` `BODY_TOO_LARGE` (checked against `Content-Length` before reading/parsing); `429` `SATURATED`; `503` `DETECTOR_UNAVAILABLE` / `AUDIT_UNAVAILABLE` / `NOT_READY` / `OVERLOADED` (connection cap); `500` `INTERNAL_ERROR` for anything unexpected; `404` `NOT_FOUND`. Every request receives a response; tracebacks are never written.
+- `GET /healthz` unauthenticated, returns readiness + policy version only (no payloads): `200 {"status":"ready"}` only after a successful detector warm-up, otherwise `503 {"status":"starting"}` (review 02).
 
 ## Controls
 
 - Loopback bind only (`127.0.0.1` default); `create_server` refuses non-loopback hosts — public hosting requires separate G4 approval.
 - Bearer token compared with `hmac.compare_digest`; token required at startup.
 - Wire cap 17 KiB (`MAX_WIRE_BYTES`) enforced on the header before the body is read; text still capped at 16 KiB by the pipeline (LIMIT_EXCEEDED → 200 BLOCK).
-- Bounded admission semaphore (`max_concurrent`, default 8) with 50ms wait → 429; released in `finally` on every path.
-- Socket timeout 5s: stalled/disconnected clients are dropped and their admission slot released (abandoned work is capped in-process).
+- Bounded admission semaphore (`max_concurrent`, default 8) with 50ms wait → 429; taken only *after* the full body has been read, released in `finally` on every path.
+- Connection cap (`max_connections`, default 32) enforced before parsing/auth: at most that many handler threads; excess connections get `503 OVERLOADED` and are closed.
+- Total read deadline (`read_deadline_seconds`, default 10s) for request line + headers + body, enforced by a watchdog that shuts the socket down; the 5s socket timeout still applies per `recv`. Trickling clients are dropped at the deadline.
+- Detector warm-up at `create_server()` (`warm_up=True`); engine creation is locked so only one model instance is built.
 - Decision parity with library asserted in `tests/test_http.py`.
 
 ## Known limitations
 
 - No cross-process supervisor: adapter runs in-process; a wedged CPU-bound detector inside one request cannot be force-killed (same cooperative-deadline semantics as the library). Process-level supervision remains an out-of-scope deployment concern, not implemented here.
-- Load test (saturation under sustained concurrency, memory under stalled detectors) not yet run; only deterministic 429 behavior is tested.
+- Load test (saturation under sustained concurrency, memory under stalled detectors) not yet run; only deterministic 429/503 behavior is tested.
+- Connection-cap exhaustion: an attacker that keeps `max_connections` sockets open and reconnects every `read_deadline_seconds` can still deny service; per-client limits need a reverse proxy (all loopback clients share one address).
 - No TLS: loopback/private network only; terminate TLS upstream if traffic ever leaves the host (needs separate approval).
 
 ## Rollout
