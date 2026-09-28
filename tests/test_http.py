@@ -40,12 +40,15 @@ def factory(fail: bool = False, delay: float = 0.0):
     return lambda: Pipeline(policy=POLICY, redactor=stub_redactor(fail=fail, delay=delay))
 
 
-def make_server(fail: bool = False, delay: float = 0.0, max_concurrent: int = 4):
+def make_server(
+    fail: bool = False, delay: float = 0.0, max_concurrent: int = 4, warm_up: bool = True
+):
     server = create_server(
         ServerConfig(
             auth_token=TOKEN,
             pipeline_factory=factory(fail=fail, delay=delay),
             max_concurrent=max_concurrent,
+            warm_up=warm_up,
         )
     )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -175,7 +178,9 @@ def test_saturation_returns_429():
 
 
 def test_detector_unavailable_returns_503():
-    srv = make_server(fail=True)
+    # Runtime detector outage (warm-up disabled so the failure happens per request;
+    # a failing warm-up is covered by tests/test_warm_up.py).
+    srv = make_server(fail=True, warm_up=False)
     try:
         status, payload = request(srv, "POST", "/v1/inspect",
                                   {"boundary": "user_input", "language": "en",

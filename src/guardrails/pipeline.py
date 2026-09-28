@@ -51,6 +51,18 @@ class Pipeline:
         self._states: OrderedDict[str, _RequestState] = OrderedDict()
         self._states_lock = threading.Lock()
 
+    def warm_up(self) -> int:
+        """Load models and exercise every stage once; returns elapsed ms.
+
+        Call at process start (before serving traffic) so the first request is
+        not charged for model loading and blocked with DEADLINE_EXCEEDED.
+        Raises DetectorFailure if the detector cannot be initialised.
+        """
+        start = self.clock_ms()
+        detect_injection("warm-up: hello world")
+        self.redactor.warm_up()
+        return self.clock_ms() - start
+
     # -- per-request state ------------------------------------------------
     def _state_for(self, request_id: str) -> _RequestState:
         with self._states_lock:

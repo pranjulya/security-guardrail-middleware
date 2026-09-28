@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
@@ -33,15 +34,28 @@ class DetectorFailure(Exception):
 
 
 _ENGINE: Any = None
+_ENGINE_LOCK = threading.Lock()
+
+# Exercises the NLP model and every approved recognizer (incl. the e-mail
+# recognizer's public-suffix lookup) so the first real request is warm.
+WARM_UP_TEXT = (
+    "Warm-up: John Smith, john.smith@example.com, 415-555-0132, "
+    "card 4111 1111 1111 1111."
+)
 
 
 def _get_engine():
+    """Return the process-wide AnalyzerEngine, creating it exactly once."""
     global _ENGINE
-    if _ENGINE is None:
-        from presidio_analyzer import AnalyzerEngine
+    engine = _ENGINE
+    if engine is not None:
+        return engine
+    with _ENGINE_LOCK:
+        if _ENGINE is None:
+            from presidio_analyzer import AnalyzerEngine
 
-        _ENGINE = AnalyzerEngine()
-    return _ENGINE
+            _ENGINE = AnalyzerEngine()
+        return _ENGINE
 
 
 def _presidio_detector(
@@ -99,6 +113,10 @@ class PiiRedactor:
             if s.score >= threshold:
                 valid.append(s)
         return valid
+
+    def warm_up(self) -> None:
+        """Load the detector/model and run one analysis; raises DetectorFailure."""
+        self._detect(WARM_UP_TEXT)
 
     def redact(self, text: str) -> Tuple[str, Action, Tuple[ReasonCode, ...]]:
         spans = self._detect(text)

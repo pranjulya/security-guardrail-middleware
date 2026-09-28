@@ -27,6 +27,7 @@ class ServerConfig:
     host: str = "127.0.0.1"
     port: int = 0
     max_concurrent: int = 8
+    warm_up: bool = True
 
     def __post_init__(self) -> None:
         if not self.auth_token:
@@ -63,9 +64,15 @@ class _Handler(BaseHTTPRequestHandler):
         expected = f"Bearer {self.config.auth_token}"
         return hmac.compare_digest(header, expected)
 
+    def _ready(self) -> bool:
+        return bool(getattr(self.server, "ready", False))
+
     def do_GET(self) -> None:
         if self.path == "/healthz":
-            self._send(200, {"status": "ready", "policy_version": self.policy_version})
+            if self._ready():
+                self._send(200, {"status": "ready", "policy_version": self.policy_version})
+            else:
+                self._send(503, {"status": "starting", "policy_version": self.policy_version})
         else:
             self._send(404, {"code": "NOT_FOUND"})
 
@@ -75,6 +82,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if not self._authorized():
             self._send(401, {"code": "UNAUTHORIZED"})
+            return
+        if not self._ready():
+            self._send(503, {"code": "NOT_READY"})
             return
         length_header = self.headers.get("Content-Length")
         try:
@@ -130,8 +140,29 @@ class _Handler(BaseHTTPRequestHandler):
             self.admission.release()
 
 
-def create_server(config: ServerConfig) -> ThreadingHTTPServer:
+class GuardrailHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that reports readiness only after warm-up."""
+
+    ready: bool = False
+    warm_up_ms: int | None = None
+
+
+def create_server(config: ServerConfig) -> GuardrailHTTPServer:
+    """Build the server; warm the detector *before* reporting ready.
+
+    With ``config.warm_up`` (default) the model is loaded and exercised once
+    here, so the first request is not blocked by cold-start latency. If warm-up
+    fails the server still binds but ``/healthz`` and ``/v1/inspect`` answer 503
+    until the process is restarted (fail closed, visible to supervisors).
+    """
     startup = config.pipeline_factory()
+    ready = True
+    warm_up_ms: int | None = None
+    if config.warm_up:
+        try:
+            warm_up_ms = startup.warm_up()
+        except Exception:
+            ready = False
 
     class Handler(_Handler):
         pass
@@ -139,6 +170,8 @@ def create_server(config: ServerConfig) -> ThreadingHTTPServer:
     Handler.config = config
     Handler.admission = threading.BoundedSemaphore(config.max_concurrent)
     Handler.policy_version = startup.policy.version
-    server = ThreadingHTTPServer((config.host, config.port), Handler)
+    server = GuardrailHTTPServer((config.host, config.port), Handler)
     server.daemon_threads = True
+    server.warm_up_ms = warm_up_ms
+    server.ready = ready
     return server
