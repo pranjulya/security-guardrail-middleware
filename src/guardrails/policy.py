@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -18,6 +20,7 @@ from .contracts import (
     SUPPORTED_LANGUAGE,
     ReasonCode,
 )
+from .injection import RULE_ORDER
 
 
 class PolicyError(Exception):
@@ -50,10 +53,10 @@ def _digest(canonical: str) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def load_policy(data: Any) -> PolicySnapshot:
-    if not isinstance(data, Mapping):
-        raise PolicyError()
-    allowed_keys = {
+KNOWN_RULE_IDS = frozenset(RULE_ORDER)
+_VERSION_PATTERN = re.compile(r"[A-Za-z0-9._-]{1,32}")
+_ALLOWED_KEYS = frozenset(
+    {
         "version",
         "entities",
         "thresholds",
@@ -64,28 +67,64 @@ def load_policy(data: Any) -> PolicySnapshot:
         "inspection_budget_ms",
         "language",
     }
-    if any(k not in allowed_keys for k in data):
+)
+
+
+def _strict_int(value: object, upper: int) -> int:
+    # bool is a subclass of int: reject it explicitly (review 02, M5).
+    if type(value) is not int or not 0 < value <= upper:
+        raise PolicyError()
+    return value
+
+
+def _strict_threshold(value: object) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or not 0.0 <= value <= 1.0
+    ):
+        raise PolicyError()
+    return float(value)
+
+
+def load_policy(data: Any) -> PolicySnapshot:
+    """Validate ``data`` and return a snapshot. Raises only PolicyError."""
+    try:
+        return _load_policy(data)
+    except PolicyError:
+        raise
+    except Exception as exc:
+        raise PolicyError() from exc
+
+
+def _load_policy(data: Any) -> PolicySnapshot:
+    if not isinstance(data, Mapping):
+        raise PolicyError()
+    if any(k not in _ALLOWED_KEYS for k in data):
         raise PolicyError()
     version = data.get("version")
     entities = data.get("entities")
     thresholds = data.get("thresholds")
     rules = data.get("rules")
-    if not isinstance(version, str) or not version:
+    if not isinstance(version, str) or not _VERSION_PATTERN.fullmatch(version):
         raise PolicyError()
     if not isinstance(entities, (list, tuple)) or not entities:
+        raise PolicyError()
+    if not all(isinstance(e, str) for e in entities) or len(set(entities)) != len(entities):
         raise PolicyError()
     if set(entities) - set(APPROVED_ENTITIES):
         raise PolicyError()
     if not isinstance(thresholds, Mapping):
         raise PolicyError()
-    for entity, value in thresholds.items():
-        if entity not in APPROVED_ENTITIES:
-            raise PolicyError()
-        if not isinstance(value, (int, float)) or not 0.0 <= value <= 1.0:
-            raise PolicyError()
+    # Exactly one threshold per enabled entity: no silent 0.0 default, no dead
+    # thresholds for disabled entities.
+    if set(thresholds) != set(entities):
+        raise PolicyError()
+    clean_thresholds = {entity: _strict_threshold(v) for entity, v in thresholds.items()}
     if not isinstance(rules, (list, tuple)) or not rules:
         raise PolicyError()
-    seen_ids = set()
+    seen_ids: set[str] = set()
     for rule in rules:
         if not isinstance(rule, Mapping):
             raise PolicyError()
@@ -93,7 +132,8 @@ def load_policy(data: Any) -> PolicySnapshot:
             raise PolicyError()
         rule_id = rule.get("id")
         action = rule.get("action")
-        if not isinstance(rule_id, str) or not rule_id:
+        # Unknown rule ids would silently do nothing; reject typos.
+        if not isinstance(rule_id, str) or rule_id not in KNOWN_RULE_IDS:
             raise PolicyError()
         if action != "BLOCK":
             raise PolicyError()
@@ -102,27 +142,15 @@ def load_policy(data: Any) -> PolicySnapshot:
         seen_ids.add(rule_id)
     if not _MANDATORY_RULE_IDS.issubset(seen_ids):
         raise PolicyError()
-    max_text_bytes = data.get("max_text_bytes", MAX_TEXT_BYTES)
-    max_aggregate_bytes = data.get("max_aggregate_bytes", MAX_AGGREGATE_BYTES)
-    max_blocks = data.get("max_blocks", MAX_BLOCKS)
-    budget = data.get("inspection_budget_ms", INSPECTION_BUDGET_MS)
+    max_text_bytes = _strict_int(data.get("max_text_bytes", MAX_TEXT_BYTES), MAX_TEXT_BYTES)
+    max_aggregate_bytes = _strict_int(
+        data.get("max_aggregate_bytes", MAX_AGGREGATE_BYTES), MAX_AGGREGATE_BYTES
+    )
+    max_blocks = _strict_int(data.get("max_blocks", MAX_BLOCKS), MAX_BLOCKS)
+    budget = _strict_int(
+        data.get("inspection_budget_ms", INSPECTION_BUDGET_MS), INSPECTION_BUDGET_MS
+    )
     language = data.get("language", SUPPORTED_LANGUAGE)
-    if (
-        not isinstance(max_text_bytes, int)
-        or max_text_bytes <= 0
-        or max_text_bytes > MAX_TEXT_BYTES
-    ):
-        raise PolicyError()
-    if (
-        not isinstance(max_aggregate_bytes, int)
-        or max_aggregate_bytes <= 0
-        or max_aggregate_bytes > MAX_AGGREGATE_BYTES
-    ):
-        raise PolicyError()
-    if not isinstance(max_blocks, int) or max_blocks <= 0 or max_blocks > MAX_BLOCKS:
-        raise PolicyError()
-    if not isinstance(budget, int) or budget <= 0 or budget > INSPECTION_BUDGET_MS:
-        raise PolicyError()
     if language != SUPPORTED_LANGUAGE:
         raise PolicyError()
     canonical = json.dumps(
@@ -144,7 +172,7 @@ def load_policy(data: Any) -> PolicySnapshot:
         version=version,
         digest=_digest(canonical),
         entities=frozenset(entities),
-        thresholds=dict(thresholds),
+        thresholds=clean_thresholds,
         rules=tuple(sorted(seen_ids)),
         max_text_bytes=max_text_bytes,
         max_aggregate_bytes=max_aggregate_bytes,
