@@ -42,6 +42,7 @@ class ReasonCode(str, Enum):
     PII_REDACTED = "PII_REDACTED"
     RESIDUAL_PII = "RESIDUAL_PII"
     TOOL_DENIED = "TOOL_DENIED"
+    AUDIT_ERROR = "AUDIT_ERROR"
 
 
 class EnvelopeError(Exception):
@@ -88,6 +89,14 @@ class Decision:
         }
 
 
+def utf8_len(text: str) -> int:
+    """UTF-8 byte length; unencodable text (e.g. lone surrogates) is invalid."""
+    try:
+        return len(text.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise EnvelopeError(ReasonCode.INVALID_ENVELOPE) from None
+
+
 def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
     if not isinstance(data, Mapping):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
@@ -101,7 +110,7 @@ def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
     if not isinstance(text, str) or not text.strip():
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     max_bytes = getattr(policy, "max_text_bytes", MAX_TEXT_BYTES)
-    if len(text.encode("utf-8")) > max_bytes:
+    if utf8_len(text) > max_bytes:
         raise EnvelopeError(ReasonCode.LIMIT_EXCEEDED)
     request_id = data.get("request_id")
     policy_id = data.get("policy_id")

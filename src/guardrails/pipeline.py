@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Iterable, Mapping, Optional
 
 from .audit import build_event
 from .contracts import (
@@ -13,6 +13,7 @@ from .contracts import (
     EnvelopeError,
     ReasonCode,
     RequestBudget,
+    utf8_len,
     validate_envelope,
 )
 from .injection import InjectionScanLimit
@@ -37,6 +38,7 @@ class Pipeline:
     max_tool_invocations: int = 1
 
     def __post_init__(self) -> None:
+        self.sink_failures = 0
         self._active_request_id: Optional[str] = None
         self._reset_request_state()
 
@@ -67,8 +69,30 @@ class Pipeline:
         self._remaining_ms -= self.clock_ms() - stage_start
 
     def inspect(self, envelope_data: Mapping[str, Any]) -> Decision:
+        """Inspect one block. Total: always returns a Decision, never raises."""
         start = self.clock_ms()
+        try:
+            return self._inspect(envelope_data, start)
+        except Exception:
+            return self._fail_closed(ReasonCode.DETECTOR_ERROR, start)
+
+    def _fail_closed(
+        self, reason: ReasonCode, start: int, boundary: str = "", request_id: str = ""
+    ) -> Decision:
+        try:
+            decision = self._block((reason,), start)
+        except Exception:
+            decision = Decision(
+                action=Action.BLOCK,
+                reason_codes=(reason,),
+                policy_version=str(getattr(self.policy, "version", "")),
+            )
+        return self._finish(decision, boundary, 0, request_id, ())
+
+    def _inspect(self, envelope_data: Any, start: int) -> Decision:
         rule_ids: tuple = ()
+        if not isinstance(envelope_data, Mapping):
+            return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start)
         raw_boundary = envelope_data.get("boundary", "")
         boundary = str(getattr(raw_boundary, "value", raw_boundary))
         request_id = str(envelope_data.get("request_id", ""))
@@ -165,8 +189,15 @@ class Pipeline:
         return self._finish(decision, boundary, byte_len,
                             envelope.request_id, rule_ids)
 
-    def collect_model_output(self, chunks: list[str]) -> Decision:
+    def collect_model_output(self, chunks: Iterable[str]) -> Decision:
+        """Buffer model output privately, then inspect. Never raises."""
         start = self.clock_ms()
+        try:
+            return self._collect_model_output(chunks, start)
+        except Exception:
+            return self._fail_closed(ReasonCode.DETECTOR_ERROR, start, "model_output")
+
+    def _collect_model_output(self, chunks: Any, start: int) -> Decision:
         request_id = self._active_request_id or "model-output"
         buffered: list[str] = []
         total = 0
@@ -174,8 +205,34 @@ class Pipeline:
             self.policy.max_text_bytes,
             self.policy.max_aggregate_bytes - self._budget.bytes_used,
         )
-        for chunk in chunks:
-            total += len(chunk.encode("utf-8"))
+        if isinstance(chunks, (str, bytes, bytearray)):
+            chunks = [chunks]
+        try:
+            iterator = iter(chunks)
+        except TypeError:
+            return self._fail_closed(
+                ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
+            )
+        while True:
+            try:
+                chunk = next(iterator)
+            except StopIteration:
+                break
+            except Exception:
+                # A failing/aborted model stream is incomplete output: release nothing.
+                return self._fail_closed(
+                    ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
+                )
+            if not isinstance(chunk, str):
+                return self._fail_closed(
+                    ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
+                )
+            try:
+                total += utf8_len(chunk)
+            except EnvelopeError:
+                return self._fail_closed(
+                    ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
+                )
             if total > per_text_cap:
                 return self._finish(
                     self._block((ReasonCode.LIMIT_EXCEEDED,), start),
@@ -227,20 +284,52 @@ class Pipeline:
         request_id: str,
         rule_ids: tuple,
     ) -> Decision:
-        if self.event_sink is not None:
-            event = build_event(
-                request_id=request_id or "unknown",
-                boundary=boundary,
-                action=decision.action,
-                reason_codes=decision.reason_codes,
+        if self.event_sink is None:
+            return decision
+        try:
+            self._emit(decision, boundary, text_byte_len, request_id, rule_ids)
+        except Exception:
+            # Audit is mandatory once a sink is configured: a failing sink must
+            # never crash the caller or silently release text. Fail closed.
+            self.sink_failures += 1
+            reasons = tuple(r for r in decision.reason_codes if r is not ReasonCode.AUDIT_ERROR)
+            blocked = Decision(
+                action=Action.BLOCK,
+                reason_codes=(*reasons, ReasonCode.AUDIT_ERROR)
+                if decision.action is Action.BLOCK
+                else (ReasonCode.AUDIT_ERROR,),
                 policy_version=decision.policy_version,
                 detector_versions=decision.detector_versions,
                 elapsed_ms=decision.elapsed_ms,
-                text_byte_len=text_byte_len,
-                rule_ids=tuple(rule_ids),
             )
-            self.event_sink(event.to_dict())
+            try:
+                self._emit(blocked, boundary, text_byte_len, request_id, rule_ids)
+            except Exception:
+                self.sink_failures += 1
+            return blocked
         return decision
+
+    def _emit(
+        self,
+        decision: Decision,
+        boundary: str,
+        text_byte_len: int,
+        request_id: str,
+        rule_ids: tuple,
+    ) -> None:
+        assert self.event_sink is not None
+        event = build_event(
+            request_id=request_id or "unknown",
+            boundary=boundary,
+            action=decision.action,
+            reason_codes=decision.reason_codes,
+            policy_version=decision.policy_version,
+            detector_versions=decision.detector_versions,
+            elapsed_ms=decision.elapsed_ms,
+            text_byte_len=text_byte_len,
+            rule_ids=tuple(rule_ids),
+        )
+        self.event_sink(event.to_dict())
 
 
 class _PipelineBlock(Exception):
