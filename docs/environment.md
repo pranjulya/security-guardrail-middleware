@@ -16,7 +16,10 @@ Date: 2026-09-25. Machine: darwin arm64, local dev host.
 | pytest | 8.4.2 (PyPI) | MIT |
 
 Presidio supported Python per docs: 3.10/3.11/3.12/3.13. System Python 3.9.6 is NOT used.
-Install: `python3.12 -m venv .venv && .venv/bin/pip install -e . && .venv/bin/python -m spacy download en_core_web_lg`
+Install (review 02, one step; the model wheel is pinned by URL + sha256 in `pyproject.toml` because spaCy models are not on PyPI):
+`python3.12 -m venv .venv && .venv/bin/pip install -e ".[test]"` (or `uv venv -p 3.12 && uv pip install -e ".[test]"`).
+Building requires `setuptools>=77` (PEP 639 SPDX `license = "MIT"`); `python -m build` fetches it automatically in an isolated build env.
+Previous instruction (`pip install -e .` then `spacy download`) failed on a clean machine because `en-core-web-lg==3.8.0` cannot be resolved from PyPI.
 Clean-install reproduction (this host, 2026-09-25): `pip install -e .` OK after adding explicit `[tool.setuptools.packages.find]` (auto-discovery refused flat layout with no packages yet); `pytest --collect-only` → 0 items, no errors.
 
 ## Verified results
