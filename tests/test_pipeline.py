@@ -193,8 +193,15 @@ def test_event_sink_receives_content_free_events_with_rule_ids():
     assert allowed["rule_ids"] == []
     for event in events:
         assert set(event) <= {
-            "request_id", "boundary", "action", "reason_codes", "rule_ids",
-            "policy_version", "detector_versions", "elapsed_ms", "byte_bucket",
+            "request_id",
+            "boundary",
+            "action",
+            "reason_codes",
+            "rule_ids",
+            "policy_version",
+            "detector_versions",
+            "elapsed_ms",
+            "byte_bucket",
         }
         assert CANARY not in json.dumps(event)
         assert "ignore all prior" not in json.dumps(event)

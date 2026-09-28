@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Optional, Tuple
-
+from typing import Any
 
 MAX_TEXT_BYTES = 16 * 1024
 MAX_AGGREGATE_BYTES = 64 * 1024
@@ -13,9 +13,7 @@ MAX_BLOCKS = 4
 INSPECTION_BUDGET_MS = 2000
 SUPPORTED_LANGUAGE = "en"
 
-APPROVED_ENTITIES = frozenset(
-    {"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"}
-)
+APPROVED_ENTITIES = frozenset({"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"})
 
 
 class Boundary(str, Enum):
@@ -67,11 +65,11 @@ class ValidatedEnvelope:
 @dataclass(frozen=True)
 class Decision:
     action: Action
-    reason_codes: Tuple[ReasonCode, ...]
+    reason_codes: tuple[ReasonCode, ...]
     policy_version: str
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
-    safe_text: Optional[str] = field(default=None, repr=False)
+    safe_text: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if self.action is Action.BLOCK and self.safe_text is not None:

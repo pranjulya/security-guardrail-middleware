@@ -23,8 +23,12 @@ def redact_detector(text, lang, entities):
 
 
 def allow_redactor():
-    return PiiRedactor(entities=sorted(POLICY.entities), thresholds=dict(POLICY.thresholds),
-                       detector=allow_detector, detector_version="stub")
+    return PiiRedactor(
+        entities=sorted(POLICY.entities),
+        thresholds=dict(POLICY.thresholds),
+        detector=allow_detector,
+        detector_version="stub",
+    )
 
 
 def pipeline(**overrides):
@@ -33,8 +37,13 @@ def pipeline(**overrides):
 
 
 def env(**overrides):
-    data = {"boundary": "user_input", "language": "en", "text": "hello",
-            "request_id": "req-1", "policy_id": POLICY.version}
+    data = {
+        "boundary": "user_input",
+        "language": "en",
+        "text": "hello",
+        "request_id": "req-1",
+        "policy_id": POLICY.version,
+    }
     data.update(overrides)
     return data
 
@@ -68,8 +77,9 @@ def test_fifth_block_rejected():
 def test_unauthorized_tool_denied_zero_dispatch():
     catalog = CatalogTool()
     try:
-        authorize_and_dispatch({"tool": "http_fetch", "arguments": {},
-                                "principal": TRUSTED}, TRUSTED, catalog)
+        authorize_and_dispatch(
+            {"tool": "http_fetch", "arguments": {}, "principal": TRUSTED}, TRUSTED, catalog
+        )
         raise AssertionError("should deny")
     except ToolDenied:
         pass
@@ -79,9 +89,15 @@ def test_unauthorized_tool_denied_zero_dispatch():
 def test_forged_principal_denied():
     catalog = CatalogTool()
     try:
-        authorize_and_dispatch({"tool": "catalog_lookup",
-                                "arguments": {"item_id": "item-001"},
-                                "principal": "model-admin"}, TRUSTED, catalog)
+        authorize_and_dispatch(
+            {
+                "tool": "catalog_lookup",
+                "arguments": {"item_id": "item-001"},
+                "principal": "model-admin",
+            },
+            TRUSTED,
+            catalog,
+        )
         raise AssertionError("should deny")
     except ToolDenied:
         pass
@@ -92,9 +108,12 @@ def test_mandatory_detector_error_blocks_with_no_text():
     def failing(text, lang, entities):
         raise DetectorFailure()
 
-    redactor = PiiRedactor(entities=sorted(POLICY.entities),
-                           thresholds=dict(POLICY.thresholds),
-                           detector=failing, detector_version="stub")
+    redactor = PiiRedactor(
+        entities=sorted(POLICY.entities),
+        thresholds=dict(POLICY.thresholds),
+        detector=failing,
+        detector_version="stub",
+    )
     decision = Pipeline(policy=POLICY, redactor=redactor).inspect(env())
     assert decision.action is Action.BLOCK
     assert decision.reason_codes == (ReasonCode.DETECTOR_ERROR,)

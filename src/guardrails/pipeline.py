@@ -5,8 +5,9 @@ from __future__ import annotations
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Mapping, Optional
+from typing import Any
 
 from .audit import build_event
 from .contracts import (
@@ -36,7 +37,7 @@ class Pipeline:
         default_factory=lambda: lambda: int(time.monotonic() * 1000)
     )
     detector_versions: Mapping[str, str] = field(default_factory=dict)
-    event_sink: Optional[EventSink] = None
+    event_sink: EventSink | None = None
     max_tool_invocations: int = 1
 
     max_tracked_requests: int = 4096
@@ -108,7 +109,7 @@ class Pipeline:
         start = self.clock_ms()
         try:
             return self._inspect(envelope_data, start)
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed
             return self._fail_closed(ReasonCode.DETECTOR_ERROR, start)
 
     def _fail_closed(
@@ -116,7 +117,7 @@ class Pipeline:
     ) -> Decision:
         try:
             decision = self._block((reason,), start)
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed
             decision = Decision(
                 action=Action.BLOCK,
                 reason_codes=(reason,),
@@ -142,7 +143,10 @@ class Pipeline:
         if envelope.policy_id != self.policy.version:
             return self._finish(
                 self._block((ReasonCode.POLICY_INVALID,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         try:
             state.consume(byte_len)
@@ -151,12 +155,18 @@ class Pipeline:
         except _PipelineBlock as exc:
             return self._finish(
                 self._block(exc.reasons, start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         except EnvelopeError as exc:
             return self._finish(
                 self._block((exc.reason,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         findings_start = self.clock_ms()
         try:
@@ -164,21 +174,31 @@ class Pipeline:
         except InjectionScanLimit:
             return self._finish(
                 self._block((ReasonCode.LIMIT_EXCEEDED,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         finally:
             expired = state.debit(self.clock_ms() - findings_start)
         if expired:
             return self._finish(
                 self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         if findings:
             rule_ids = tuple(f.rule_id for f in findings)
             return self._finish(
-                self._block((ReasonCode.INJECTION_RULE,), start,
-                            extra_versions={"injection": "rules-v1"}),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                self._block(
+                    (ReasonCode.INJECTION_RULE,), start, extra_versions={"injection": "rules-v1"}
+                ),
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         redact_start = self.clock_ms()
         try:
@@ -186,14 +206,20 @@ class Pipeline:
         except DetectorFailure:
             return self._finish(
                 self._block((ReasonCode.DETECTOR_ERROR,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         finally:
             expired = state.debit(self.clock_ms() - redact_start)
         if expired:
             return self._finish(
                 self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
-                boundary, byte_len, envelope.request_id, rule_ids,
+                boundary,
+                byte_len,
+                envelope.request_id,
+                rule_ids,
             )
         elapsed = self.clock_ms() - start
         if action is Action.BLOCK:
@@ -222,8 +248,7 @@ class Pipeline:
                 elapsed_ms=elapsed,
                 safe_text=envelope.text,
             )
-        return self._finish(decision, boundary, byte_len,
-                            envelope.request_id, rule_ids)
+        return self._finish(decision, boundary, byte_len, envelope.request_id, rule_ids)
 
     def collect_model_output(self, chunks: Iterable[str], *, request_id: str) -> Decision:
         """Buffer model output for ``request_id`` privately, then inspect.
@@ -234,7 +259,7 @@ class Pipeline:
         start = self.clock_ms()
         try:
             return self._collect_model_output(chunks, start, request_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed
             return self._fail_closed(
                 ReasonCode.DETECTOR_ERROR, start, "model_output", _safe_str(request_id)
             )
@@ -254,15 +279,13 @@ class Pipeline:
         try:
             iterator = iter(chunks)
         except TypeError:
-            return self._fail_closed(
-                ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
-            )
+            return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id)
         while True:
             try:
                 chunk = next(iterator)
             except StopIteration:
                 break
-            except Exception:
+            except Exception:  # noqa: BLE001 - fail closed
                 # A failing/aborted model stream is incomplete output: release nothing.
                 return self._fail_closed(
                     ReasonCode.INVALID_ENVELOPE, start, "model_output", request_id
@@ -280,14 +303,20 @@ class Pipeline:
             if total > per_text_cap:
                 return self._finish(
                     self._block((ReasonCode.LIMIT_EXCEEDED,), start),
-                    "model_output", total, request_id, (),
+                    "model_output",
+                    total,
+                    request_id,
+                    (),
                 )
             buffered.append(chunk)
         full = "".join(buffered)
         if not full.strip():
             return self._finish(
                 self._block((ReasonCode.INVALID_ENVELOPE,), start),
-                "model_output", total, request_id, (),
+                "model_output",
+                total,
+                request_id,
+                (),
             )
         return self.inspect(
             {
@@ -301,14 +330,10 @@ class Pipeline:
 
     def _versions(self) -> dict:
         versions = dict(self.detector_versions)
-        versions.setdefault(
-            "pii", getattr(self.redactor, "detector_version", "unknown")
-        )
+        versions.setdefault("pii", getattr(self.redactor, "detector_version", "unknown"))
         return versions
 
-    def _block(
-        self, reasons: tuple, start: int, extra_versions: Mapping | None = None
-    ) -> Decision:
+    def _block(self, reasons: tuple, start: int, extra_versions: Mapping | None = None) -> Decision:
         versions = self._versions()
         if extra_versions:
             versions.update(extra_versions)
@@ -332,7 +357,7 @@ class Pipeline:
             return decision
         try:
             self._emit(decision, boundary, text_byte_len, request_id, rule_ids)
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed
             # Audit is mandatory once a sink is configured: a failing sink must
             # never crash the caller or silently release text. Fail closed.
             self.sink_failures += 1
@@ -348,7 +373,7 @@ class Pipeline:
             )
             try:
                 self._emit(blocked, boundary, text_byte_len, request_id, rule_ids)
-            except Exception:
+            except Exception:  # noqa: BLE001 - fail closed
                 self.sink_failures += 1
             return blocked
         return decision
@@ -361,7 +386,9 @@ class Pipeline:
         request_id: str,
         rule_ids: tuple,
     ) -> None:
-        assert self.event_sink is not None
+        sink = self.event_sink
+        if sink is None:
+            return
         event = build_event(
             request_id=request_id or "unknown",
             boundary=boundary,
@@ -373,7 +400,7 @@ class Pipeline:
             text_byte_len=text_byte_len,
             rule_ids=tuple(rule_ids),
         )
-        self.event_sink(event.to_dict())
+        sink(event.to_dict())
 
 
 @dataclass

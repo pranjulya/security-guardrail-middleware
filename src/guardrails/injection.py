@@ -231,11 +231,11 @@ _V_REVEAL = (
     r"(?:reveal|print|show|display|output|repeat|dump|leak|disclose|expose|"
     r"recite|echo|tell me|give me)"
 )
-_O_SECRET = (
+_O_HIDDEN_ADJ = (
     r"(?:system|hidden|secret|initial|original|internal|confidential|admin|"
     r"developer)"
 )
-_N_SECRET = (
+_N_HIDDEN_NOUN = (
     r"(?:prompts?|instructions?|message|notes?|passwords?|keys?|credentials?|"
     r"config(?:uration)?|rules|tokens?|secrets?)"
 )
@@ -332,7 +332,7 @@ _RULES: tuple[tuple[str, tuple[str, ...], str], ...] = (
         ("lite", "words"),
         (
             rf"\b{_V_REVEAL}\s+(?:me\s+)?(?:the\s+|your\s+|all\s+|any\s+)?(?:\w+\s+)?"
-            rf"{_O_SECRET}\s+(?:\w+\s+)?{_N_SECRET}\b"
+            rf"{_O_HIDDEN_ADJ}\s+(?:\w+\s+)?{_N_HIDDEN_NOUN}\b"
         ),
     ),
     (
@@ -492,9 +492,7 @@ def _scan(views: list[tuple[str, str]], wanted: set[str] | None, found: dict) ->
                 break
 
 
-def detect(
-    text: str, rule_ids: Iterable[str] | None = None
-) -> tuple[InjectionFinding, ...]:
+def detect(text: str, rule_ids: Iterable[str] | None = None) -> tuple[InjectionFinding, ...]:
     """Return findings (canonical rule order). Raises InjectionScanLimit on oversize."""
     wanted = set(rule_ids) if rule_ids is not None else None
     found: dict[str, InjectionFinding] = {}

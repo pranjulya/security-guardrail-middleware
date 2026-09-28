@@ -42,9 +42,7 @@ def test_interleaved_request_ids_do_not_reset_each_others_budget():
     for rid, decisions in results.items():
         actions = [d.action for d in decisions]
         assert actions[:4] == [Action.ALLOW] * 4, rid
-        assert all(
-            d.reason_codes == (ReasonCode.LIMIT_EXCEEDED,) for d in decisions[4:]
-        ), rid
+        assert all(d.reason_codes == (ReasonCode.LIMIT_EXCEEDED,) for d in decisions[4:]), rid
 
 
 def test_concurrent_requests_do_not_share_deadline_budget():
@@ -78,9 +76,7 @@ def test_same_request_id_budget_is_atomic_under_concurrency():
 
     pipeline = make(slowish)
     with ThreadPoolExecutor(16) as pool:
-        decisions = list(
-            pool.map(lambda i: pipeline.inspect(env("shared", f"x{i}")), range(32))
-        )
+        decisions = list(pool.map(lambda i: pipeline.inspect(env("shared", f"x{i}")), range(32)))
     allowed = [d for d in decisions if d.action is Action.ALLOW]
     assert len(allowed) == POLICY.max_blocks
     assert pipeline.request_usage("shared")[0] == POLICY.max_blocks
@@ -103,9 +99,7 @@ def test_model_output_attributed_and_charged_to_explicit_request():
     pipeline = make(event_sink=events.append)
     pipeline.inspect(env("alice-req"))
     pipeline.inspect(env("bob-req"))
-    decision = pipeline.collect_model_output(
-        ["model output for alice"], request_id="alice-req"
-    )
+    decision = pipeline.collect_model_output(["model output for alice"], request_id="alice-req")
     assert decision.action is Action.ALLOW
     assert events[-1]["request_id"] == "alice-req"
     assert pipeline.request_usage("alice-req")[0] == 2

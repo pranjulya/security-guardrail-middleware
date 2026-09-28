@@ -6,9 +6,7 @@ import re
 import tomllib
 from pathlib import Path
 
-PYPROJECT = tomllib.loads(
-    (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text()
-)
+PYPROJECT = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())
 
 
 def _setuptools_floor() -> tuple[int, ...]:
@@ -36,9 +34,7 @@ def test_spacy_model_is_pinned_by_url_and_hash_not_pypi_name():
 def test_model_version_matches_documented_detector_version():
     from guardrails.pii import PiiRedactor
 
-    spec = next(
-        d for d in PYPROJECT["project"]["dependencies"] if "en-core-web-lg" in d
-    )
+    spec = next(d for d in PYPROJECT["project"]["dependencies"] if "en-core-web-lg" in d)
     version = re.search(r"en_core_web_lg-(\d+\.\d+\.\d+)-py3", spec).group(1)
     assert f"en_core_web_lg=={version}" in PiiRedactor(entities=[]).detector_version
 

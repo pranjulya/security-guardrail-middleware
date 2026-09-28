@@ -39,7 +39,7 @@ def envelope(**overrides):
 def test_valid_envelope_passes():
     env = validate_envelope(envelope(), VALID_POLICY)
     assert env.boundary is Boundary.USER_INPUT
-    assert env.text_byte_len == len("hello world".encode("utf-8"))
+    assert env.text_byte_len == len(b"hello world")
 
 
 def test_unknown_boundary_rejected():
@@ -109,7 +109,9 @@ def test_policy_rejects_unknown_keys_and_weakened_rules():
     with pytest.raises(PolicyError):
         load_policy({**DEFAULT_POLICY, "extra": True})
     with pytest.raises(PolicyError):
-        load_policy({**DEFAULT_POLICY, "rules": [{"id": "block-direct-override", "action": "BLOCK"}]})
+        load_policy(
+            {**DEFAULT_POLICY, "rules": [{"id": "block-direct-override", "action": "BLOCK"}]}
+        )
     with pytest.raises(PolicyError):
         load_policy({**DEFAULT_POLICY, "max_text_bytes": MAX_TEXT_BYTES + 1})
     with pytest.raises(PolicyError):

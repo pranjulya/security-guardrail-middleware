@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any
 
 from .contracts import Action, ReasonCode
 
@@ -26,7 +27,7 @@ class DetectedSpan:
     score: float
 
 
-DetectorFn = Callable[[str, str, Optional[Iterable[str]]], List[DetectedSpan]]
+DetectorFn = Callable[[str, str, Iterable[str] | None], list[DetectedSpan]]
 
 
 class DetectorFailure(Exception):
@@ -39,8 +40,7 @@ _ENGINE_LOCK = threading.Lock()
 # Exercises the NLP model and every approved recognizer (incl. the e-mail
 # recognizer's public-suffix lookup) so the first real request is warm.
 WARM_UP_TEXT = (
-    "Warm-up: John Smith, john.smith@example.com, 415-555-0132, "
-    "card 4111 1111 1111 1111."
+    "Warm-up: John Smith, john.smith@example.com, 415-555-0132, card 4111 1111 1111 1111."
 )
 
 
@@ -59,8 +59,8 @@ def _get_engine():
 
 
 def _presidio_detector(
-    text: str, language: str, entities: Optional[Iterable[str]]
-) -> List[DetectedSpan]:
+    text: str, language: str, entities: Iterable[str] | None
+) -> list[DetectedSpan]:
     engine = _get_engine()
     try:
         results = engine.analyze(
@@ -71,9 +71,7 @@ def _presidio_detector(
     spans = []
     for r in results:
         spans.append(
-            DetectedSpan(
-                entity_type=r.entity_type, start=r.start, end=r.end, score=r.score
-            )
+            DetectedSpan(entity_type=r.entity_type, start=r.start, end=r.end, score=r.score)
         )
     return spans
 
@@ -91,9 +89,7 @@ class PiiRedactor:
         self._detector = detector or _presidio_detector
         self.detector_version = detector_version
 
-    def _detect(
-        self, text: str, entities: Optional[Iterable[str]] = None
-    ) -> List[DetectedSpan]:
+    def _detect(self, text: str, entities: Iterable[str] | None = None) -> list[DetectedSpan]:
         wanted = list(entities) if entities is not None else sorted(self.entities)
         try:
             spans = self._detector(text, "en", wanted)
@@ -118,7 +114,7 @@ class PiiRedactor:
         """Load the detector/model and run one analysis; raises DetectorFailure."""
         self._detect(WARM_UP_TEXT)
 
-    def redact(self, text: str) -> Tuple[str, Action, Tuple[ReasonCode, ...]]:
+    def redact(self, text: str) -> tuple[str, Action, tuple[ReasonCode, ...]]:
         spans = self._detect(text)
         if not spans:
             return text, Action.ALLOW, ()
@@ -136,16 +132,16 @@ def _precedence(entity_type: str) -> int:
         return len(ENTITY_PRECEDENCE)
 
 
-def _replace_union(text: str, spans: List[DetectedSpan]) -> str:
+def _replace_union(text: str, spans: list[DetectedSpan]) -> str:
     ordered = sorted(spans, key=lambda s: (s.start, s.end))
-    groups: List[list] = []
+    groups: list[list] = []
     for span in ordered:
         if groups and span.start < groups[-1][1]:
             groups[-1][1] = max(groups[-1][1], span.end)
             groups[-1][2].append(span.entity_type)
         else:
             groups.append([span.start, span.end, [span.entity_type]])
-    parts: List[str] = []
+    parts: list[str] = []
     prev_end = 0
     for start, end, entities in groups:
         parts.append(text[prev_end:start])

@@ -24,9 +24,10 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Callable
+from typing import Any
 
 from .contracts import ReasonCode
 from .pipeline import Pipeline
@@ -195,7 +196,7 @@ class _Handler(BaseHTTPRequestHandler):
     deadline_expired = False
     _watch_token: int | None = None
 
-    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: Any) -> None:
         pass
 
     # -- connection lifecycle -------------------------------------------------
@@ -269,7 +270,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._do_post()
         except (BrokenPipeError, ConnectionResetError, TimeoutError):
             self.close_connection = True
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed: always answer
             if self.deadline_expired:
                 self.close_connection = True
             else:
@@ -374,7 +375,7 @@ def create_server(config: ServerConfig) -> GuardrailHTTPServer:
     if config.warm_up:
         try:
             warm_up_ms = startup.warm_up()
-        except Exception:
+        except Exception:  # noqa: BLE001 - fail closed: always answer
             ready = False
 
     class Handler(_Handler):

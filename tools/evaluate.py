@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import json
 import platform
@@ -15,8 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from guardrails.pipeline import Pipeline  # noqa: E402
 from guardrails.pii import PiiRedactor, _presidio_detector  # noqa: E402
+from guardrails.pipeline import Pipeline  # noqa: E402
 from guardrails.policy import DEFAULT_POLICY, load_policy  # noqa: E402
 
 CANARY = "SYNTH_EVAL_CANARY_7f3a9d"
@@ -53,7 +52,7 @@ def pii_metrics(redactor: PiiRedactor, records: list) -> dict:
             by_entity[key[0]]["fn"] += 1
         out, _, _ = redactor.redact(text)
         for span in record.get("entity_spans", []):
-            raw = text[span["start"]:span["end"]]
+            raw = text[span["start"] : span["end"]]
             if raw and raw in out:
                 leakage += 1
                 break
@@ -63,8 +62,14 @@ def pii_metrics(redactor: PiiRedactor, records: list) -> dict:
         denom = tp + fn
         precision = tp / (tp + fp) if (tp + fp) else 0.0
         recall = tp / denom if denom else 0.0
-        rows[entity] = {"tp": tp, "fp": fp, "fn": fn, "positives": denom,
-                        "precision": round(precision, 4), "recall": round(recall, 4)}
+        rows[entity] = {
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "positives": denom,
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+        }
     return {"by_entity": rows, "leakage_cases": leakage}
 
 
@@ -75,20 +80,37 @@ def timing_stats(pipeline_factory, sizes=(512, 4096), repeats=200, warmups=20) -
         text = text[:size]
         pipe = pipeline_factory()
         for _ in range(warmups):
-            pipe.inspect({"boundary": "user_input", "language": "en", "text": text,
-                          "request_id": "warm", "policy_id": pipe.policy.version})
+            pipe.inspect(
+                {
+                    "boundary": "user_input",
+                    "language": "en",
+                    "text": text,
+                    "request_id": "warm",
+                    "policy_id": pipe.policy.version,
+                }
+            )
         samples = []
         for i in range(repeats):
             pipe = pipeline_factory() if i % 50 == 0 else pipe
             start = time.perf_counter()
-            pipe.inspect({"boundary": "user_input", "language": "en", "text": text,
-                          "request_id": f"t{i}", "policy_id": pipe.policy.version})
+            pipe.inspect(
+                {
+                    "boundary": "user_input",
+                    "language": "en",
+                    "text": text,
+                    "request_id": f"t{i}",
+                    "policy_id": pipe.policy.version,
+                }
+            )
             samples.append((time.perf_counter() - start) * 1000)
         samples.sort()
-        stats[str(size)] = {"n": repeats, "p50_ms": round(samples[len(samples) // 2], 2),
-                            "p95_ms": round(samples[int(len(samples) * 0.95) - 1], 2),
-                            "max_ms": round(samples[-1], 2),
-                            "mean_ms": round(statistics.mean(samples), 2)}
+        stats[str(size)] = {
+            "n": repeats,
+            "p50_ms": round(samples[len(samples) // 2], 2),
+            "p95_ms": round(samples[int(len(samples) * 0.95) - 1], 2),
+            "max_ms": round(samples[-1], 2),
+            "mean_ms": round(statistics.mean(samples), 2),
+        }
     return stats
 
 
@@ -100,12 +122,21 @@ def main() -> int:
     args = parser.parse_args()
 
     policy = load_policy(DEFAULT_POLICY)
-    redactor = PiiRedactor(entities=sorted(policy.entities),
-                           thresholds=dict(policy.thresholds),
-                           detector=_presidio_detector)
-    factory = lambda: Pipeline(policy=policy, redactor=PiiRedactor(
-        entities=sorted(policy.entities), thresholds=dict(policy.thresholds),
-        detector=_presidio_detector))
+    redactor = PiiRedactor(
+        entities=sorted(policy.entities),
+        thresholds=dict(policy.thresholds),
+        detector=_presidio_detector,
+    )
+
+    def factory() -> Pipeline:
+        return Pipeline(
+            policy=policy,
+            redactor=PiiRedactor(
+                entities=sorted(policy.entities),
+                thresholds=dict(policy.thresholds),
+                detector=_presidio_detector,
+            ),
+        )
 
     fixture_path = ROOT / args.fixtures
     records = load_fixture(fixture_path)
@@ -115,7 +146,8 @@ def main() -> int:
     out_dir = ROOT / "reports" / "evaluation" / args.run_id
     out_dir.mkdir(parents=True, exist_ok=False)
     (out_dir / "metrics.csv").write_text(
-        "entity,tp,fp,fn,positives,precision,recall\n" + "".join(
+        "entity,tp,fp,fn,positives,precision,recall\n"
+        + "".join(
             f"{e},{v['tp']},{v['fp']},{v['fn']},{v['positives']},{v['precision']},{v['recall']}\n"
             for e, v in pii["by_entity"].items()
         )
@@ -144,7 +176,9 @@ def main() -> int:
         "|---|---|---|---|",
     ]
     for entity, values in pii["by_entity"].items():
-        summary.append(f"| {entity} | {values['positives']} | {values['precision']} | {values['recall']} |")
+        summary.append(
+            f"| {entity} | {values['positives']} | {values['precision']} | {values['recall']} |"
+        )
     summary += [
         "",
         f"Residual leakage cases: {pii['leakage_cases']}",
@@ -153,7 +187,10 @@ def main() -> int:
         "",
     ]
     for size, values in perf.items():
-        summary.append(f"- {size}B text: p50 {values['p50_ms']}ms p95 {values['p95_ms']}ms max {values['max_ms']}ms (n={values['n']})")
+        summary.append(
+            f"- {size}B text: p50 {values['p50_ms']}ms p95 {values['p95_ms']}ms "
+            f"max {values['max_ms']}ms (n={values['n']})"
+        )
     summary += [
         "",
         "## Limits",
@@ -164,9 +201,14 @@ def main() -> int:
     ]
     (out_dir / "summary.md").write_text("\n".join(summary) + "\n")
 
-    blob = ((out_dir / "summary.md").read_text() + (out_dir / "metadata.json").read_text()
-            + (out_dir / "metrics.csv").read_text())
-    assert CANARY not in blob, "canary leaked into report"
+    blob = (
+        (out_dir / "summary.md").read_text()
+        + (out_dir / "metadata.json").read_text()
+        + (out_dir / "metrics.csv").read_text()
+    )
+    if CANARY in blob:  # explicit check: survives `python -O` (was a bare assert)
+        print("canary leaked into report", file=sys.stderr)
+        return 1
     print(f"wrote {out_dir}")
     return 0
 

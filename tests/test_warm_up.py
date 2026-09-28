@@ -52,10 +52,7 @@ def test_engine_is_created_exactly_once_under_concurrency(monkeypatch):
     monkeypatch.setattr(presidio_analyzer, "AnalyzerEngine", FakeEngine)
     monkeypatch.setattr(pii, "_ENGINE", None)
     engines = []
-    threads = [
-        threading.Thread(target=lambda: engines.append(pii._get_engine()))
-        for _ in range(8)
-    ]
+    threads = [threading.Thread(target=lambda: engines.append(pii._get_engine())) for _ in range(8)]
     for t in threads:
         t.start()
     for t in threads:
@@ -99,9 +96,7 @@ def test_failed_warm_up_is_not_ready_and_refuses_traffic():
             redactor=PiiRedactor(entities=POLICY.entities, detector=detector),
         )
 
-    server = _serve(
-        create_server(ServerConfig(auth_token=TOKEN, pipeline_factory=factory))
-    )
+    server = _serve(create_server(ServerConfig(auth_token=TOKEN, pipeline_factory=factory)))
     try:
         assert server.ready is False
         status, payload = _call(server, "GET", "/healthz")
@@ -123,9 +118,7 @@ def test_live_presidio_first_request_after_warm_up_is_not_deadline_blocked(monke
     monkeypatch.setattr(pii, "_ENGINE", None)  # force a genuine cold start
     pipeline = Pipeline(
         policy=POLICY,
-        redactor=PiiRedactor(
-            entities=POLICY.entities, thresholds=dict(POLICY.thresholds)
-        ),
+        redactor=PiiRedactor(entities=POLICY.entities, thresholds=dict(POLICY.thresholds)),
     )
     pipeline.warm_up()
     decision = pipeline.inspect(

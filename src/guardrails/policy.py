@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from .contracts import (
     APPROVED_ENTITIES,
@@ -119,11 +120,7 @@ def load_policy(data: Any) -> PolicySnapshot:
         raise PolicyError()
     if not isinstance(max_blocks, int) or max_blocks <= 0 or max_blocks > MAX_BLOCKS:
         raise PolicyError()
-    if (
-        not isinstance(budget, int)
-        or budget <= 0
-        or budget > INSPECTION_BUDGET_MS
-    ):
+    if not isinstance(budget, int) or budget <= 0 or budget > INSPECTION_BUDGET_MS:
         raise PolicyError()
     if language != SUPPORTED_LANGUAGE:
         raise PolicyError()

@@ -17,9 +17,7 @@ from guardrails.policy import DEFAULT_POLICY, load_policy
 
 POLICY = load_policy(DEFAULT_POLICY)
 TOKEN = "test-token-0123456789-abcdefghijkl"
-VALID = json.dumps(
-    {"boundary": "user_input", "language": "en", "text": "hello"}
-).encode()
+VALID = json.dumps({"boundary": "user_input", "language": "en", "text": "hello"}).encode()
 
 
 def pipeline(detector=None, **kw) -> Pipeline:
@@ -33,9 +31,7 @@ def pipeline(detector=None, **kw) -> Pipeline:
 
 
 def start(factory=pipeline, token=TOKEN, **kw):
-    server = create_server(
-        ServerConfig(auth_token=token, pipeline_factory=factory, **kw)
-    )
+    server = create_server(ServerConfig(auth_token=token, pipeline_factory=factory, **kw))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -90,9 +86,7 @@ def body(response: bytes) -> dict:
 # --------------------------------------------------------------------------- H3
 
 
-@pytest.mark.parametrize(
-    "auth", [b"Bearer \xe9\xe9", b"\xff\xfe", "Bearer tök".encode()]
-)
+@pytest.mark.parametrize("auth", [b"Bearer \xe9\xe9", b"\xff\xfe", "Bearer tök".encode()])
 def test_non_ascii_authorization_gets_401(server, auth):
     response = post(server, VALID, auth=auth)
     assert status(response) == 401
@@ -213,8 +207,7 @@ def test_slow_body_clients_do_not_hold_admission_slots():
     try:
         results = [{} for _ in range(3)]
         threads = [
-            threading.Thread(target=_slow_client, args=(srv, False, 0.2, r))
-            for r in results
+            threading.Thread(target=_slow_client, args=(srv, False, 0.2, r)) for r in results
         ]
         for t in threads:
             t.start()
