@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Optional
 
@@ -37,36 +39,57 @@ class Pipeline:
     event_sink: Optional[EventSink] = None
     max_tool_invocations: int = 1
 
+    max_tracked_requests: int = 4096
+
     def __post_init__(self) -> None:
+        if self.max_tracked_requests <= 0:
+            raise ValueError("max_tracked_requests must be positive")
         self.sink_failures = 0
-        self._active_request_id: Optional[str] = None
-        self._reset_request_state()
+        # Per-request state, keyed by request_id. Never shared between
+        # different request IDs; guarded by locks so a Pipeline can be used from
+        # many threads at once.
+        self._states: OrderedDict[str, _RequestState] = OrderedDict()
+        self._states_lock = threading.Lock()
 
-    def _reset_request_state(self) -> None:
-        self._budget = RequestBudget(
-            max_blocks=self.policy.max_blocks,
-            max_bytes=self.policy.max_aggregate_bytes,
-        )
-        self._remaining_ms = self.policy.inspection_budget_ms
+    # -- per-request state ------------------------------------------------
+    def _state_for(self, request_id: str) -> _RequestState:
+        with self._states_lock:
+            state = self._states.get(request_id)
+            if state is None:
+                state = _RequestState(
+                    budget=RequestBudget(
+                        max_blocks=self.policy.max_blocks,
+                        max_bytes=self.policy.max_aggregate_bytes,
+                    ),
+                    remaining_ms=self.policy.inspection_budget_ms,
+                )
+                self._states[request_id] = state
+                # Bounded memory: evict the least recently used request. Hosts
+                # should call end_request() when a request completes.
+                while len(self._states) > self.max_tracked_requests:
+                    self._states.popitem(last=False)
+            else:
+                self._states.move_to_end(request_id)
+            return state
 
-    def _begin_request(self, request_id: str) -> None:
-        if self._active_request_id is None:
-            self._active_request_id = request_id
-        elif request_id != self._active_request_id:
-            self._active_request_id = request_id
-            self._reset_request_state()
+    def end_request(self, request_id: str) -> None:
+        """Release the budget/deadline state held for ``request_id``."""
+        with self._states_lock:
+            self._states.pop(request_id, None)
+
+    def request_usage(self, request_id: str) -> tuple[int, int]:
+        """(blocks_used, bytes_used) for ``request_id``; (0, 0) if unknown."""
+        with self._states_lock:
+            state = self._states.get(request_id)
+        if state is None:
+            return (0, 0)
+        with state.lock:
+            return (state.budget.blocks_used, state.budget.bytes_used)
 
     @property
-    def active_request_id(self) -> Optional[str]:
-        return self._active_request_id
-
-    def _check_deadline(self, start_ms: int) -> None:
-        self._remaining_ms -= self.clock_ms() - start_ms
-        if self._remaining_ms < 0:
-            raise _PipelineBlock((ReasonCode.DEADLINE_EXCEEDED,))
-
-    def _stage_debit(self, stage_start: int) -> None:
-        self._remaining_ms -= self.clock_ms() - stage_start
+    def tracked_requests(self) -> int:
+        with self._states_lock:
+            return len(self._states)
 
     def inspect(self, envelope_data: Mapping[str, Any]) -> Decision:
         """Inspect one block. Total: always returns a Decision, never raises."""
@@ -102,7 +125,7 @@ class Pipeline:
             return self._finish(
                 self._block((exc.reason,), start), boundary, 0, request_id, rule_ids
             )
-        self._begin_request(envelope.request_id)
+        state = self._state_for(envelope.request_id)
         byte_len = envelope.text_byte_len
         if envelope.policy_id != self.policy.version:
             return self._finish(
@@ -110,8 +133,9 @@ class Pipeline:
                 boundary, byte_len, envelope.request_id, rule_ids,
             )
         try:
-            self._budget.consume(byte_len)
-            self._check_deadline(start)
+            state.consume(byte_len)
+            if state.debit(self.clock_ms() - start):
+                raise _PipelineBlock((ReasonCode.DEADLINE_EXCEEDED,))
         except _PipelineBlock as exc:
             return self._finish(
                 self._block(exc.reasons, start),
@@ -131,8 +155,8 @@ class Pipeline:
                 boundary, byte_len, envelope.request_id, rule_ids,
             )
         finally:
-            self._stage_debit(findings_start)
-        if self._remaining_ms < 0:
+            expired = state.debit(self.clock_ms() - findings_start)
+        if expired:
             return self._finish(
                 self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
                 boundary, byte_len, envelope.request_id, rule_ids,
@@ -153,8 +177,8 @@ class Pipeline:
                 boundary, byte_len, envelope.request_id, rule_ids,
             )
         finally:
-            self._stage_debit(redact_start)
-        if self._remaining_ms < 0:
+            expired = state.debit(self.clock_ms() - redact_start)
+        if expired:
             return self._finish(
                 self._block((ReasonCode.DEADLINE_EXCEEDED,), start),
                 boundary, byte_len, envelope.request_id, rule_ids,
@@ -189,21 +213,29 @@ class Pipeline:
         return self._finish(decision, boundary, byte_len,
                             envelope.request_id, rule_ids)
 
-    def collect_model_output(self, chunks: Iterable[str]) -> Decision:
-        """Buffer model output privately, then inspect. Never raises."""
+    def collect_model_output(self, chunks: Iterable[str], *, request_id: str) -> Decision:
+        """Buffer model output for ``request_id`` privately, then inspect.
+
+        The request ID is explicit so output is always charged to, and audited
+        under, the request that produced it. Never raises.
+        """
         start = self.clock_ms()
         try:
-            return self._collect_model_output(chunks, start)
+            return self._collect_model_output(chunks, start, request_id)
         except Exception:
-            return self._fail_closed(ReasonCode.DETECTOR_ERROR, start, "model_output")
+            return self._fail_closed(
+                ReasonCode.DETECTOR_ERROR, start, "model_output", _safe_str(request_id)
+            )
 
-    def _collect_model_output(self, chunks: Any, start: int) -> Decision:
-        request_id = self._active_request_id or "model-output"
+    def _collect_model_output(self, chunks: Any, start: int, request_id: Any) -> Decision:
+        if not isinstance(request_id, str) or not request_id:
+            return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start, "model_output")
         buffered: list[str] = []
         total = 0
+        _, bytes_used = self.request_usage(request_id)
         per_text_cap = min(
             self.policy.max_text_bytes,
-            self.policy.max_aggregate_bytes - self._budget.bytes_used,
+            self.policy.max_aggregate_bytes - bytes_used,
         )
         if isinstance(chunks, (str, bytes, bytearray)):
             chunks = [chunks]
@@ -330,6 +362,27 @@ class Pipeline:
             rule_ids=tuple(rule_ids),
         )
         self.event_sink(event.to_dict())
+
+
+@dataclass
+class _RequestState:
+    budget: RequestBudget
+    remaining_ms: int
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def consume(self, byte_len: int) -> None:
+        with self.lock:
+            self.budget.consume(byte_len)
+
+    def debit(self, elapsed_ms: int) -> bool:
+        """Charge elapsed time; True once the request's budget is exhausted."""
+        with self.lock:
+            self.remaining_ms -= max(0, elapsed_ms)
+            return self.remaining_ms < 0
+
+
+def _safe_str(value: Any) -> str:
+    return value if isinstance(value, str) else ""
 
 
 class _PipelineBlock(Exception):

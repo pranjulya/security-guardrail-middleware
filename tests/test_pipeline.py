@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from guardrails.contracts import Action, ReasonCode
 from guardrails.pii import DetectorFailure, PiiRedactor
 from guardrails.pipeline import Pipeline, refusal_text
@@ -93,7 +91,7 @@ def test_detector_exception_releases_zero_bytes():
 def test_oversize_after_generation_discarded():
     big = "a" * (16 * 1024 + 1)
     pipeline = make_pipeline()
-    decision = pipeline.collect_model_output([big])
+    decision = pipeline.collect_model_output([big], request_id="req-1")
     assert decision.action is Action.BLOCK
     assert decision.reason_codes == (ReasonCode.LIMIT_EXCEEDED,)
     assert decision.safe_text is None
@@ -102,7 +100,7 @@ def test_oversize_after_generation_discarded():
 def test_streaming_chunks_buffered_until_inspection():
     pipeline = make_pipeline()
     released = []
-    decision = pipeline.collect_model_output(["hello ", "world"])
+    decision = pipeline.collect_model_output(["hello ", "world"], request_id="req-1")
     if decision.action is not Action.BLOCK:
         released.append(decision.safe_text)
     assert released == ["hello world"]
@@ -126,7 +124,10 @@ def test_new_request_resets_budget():
     assert blocked.action is Action.BLOCK
     fresh = pipeline.inspect(env(text="next request ok", request_id="req-b"))
     assert fresh.action is Action.ALLOW
-    assert pipeline.active_request_id == "req-b"
+    assert pipeline.request_usage("req-b") == (1, len("next request ok"))
+    # Review 02: req-a keeps its own exhausted budget; it is not reset by req-b.
+    again = pipeline.inspect(env(text="sixth", request_id="req-a"))
+    assert again.reason_codes == (ReasonCode.LIMIT_EXCEEDED,)
 
 
 def test_deadline_exceeded_releases_nothing():
@@ -152,11 +153,11 @@ def test_policy_snapshot_unchanged_mid_request():
 def test_structured_tool_proposal_not_a_free_text_block():
     pipeline = make_pipeline()
     proposal = {"tool": "catalog_lookup", "arguments": {"item_id": "item-001"}}
-    assert pipeline._budget.blocks_used == 0
+    assert pipeline.request_usage("req-1") == (0, 0)
     _ = proposal
     decision = pipeline.inspect(env())
     assert decision.action is Action.ALLOW
-    assert pipeline._budget.blocks_used == 1
+    assert pipeline.request_usage("req-1")[0] == 1
 
 
 def test_block_routes_return_fixed_refusal_and_no_canary(caplog):

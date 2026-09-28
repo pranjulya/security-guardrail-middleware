@@ -108,6 +108,6 @@ def test_blocked_output_releases_zero_bytes():
 
 
 def test_oversize_generation_discarded():
-    decision = pipeline().collect_model_output(["b" * (16 * 1024 + 1)])
+    decision = pipeline().collect_model_output(["b" * (16 * 1024 + 1)], request_id="req-1")
     assert decision.action is Action.BLOCK
     assert decision.safe_text is None

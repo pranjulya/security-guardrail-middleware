@@ -74,7 +74,18 @@ def test_lone_surrogate_text_blocks(text):
     [[b"bytes"], ["ok", None], ["ok", 5], ["a\udfff"], None, 5, object()],
 )
 def test_bad_model_output_chunks_block(chunks):
-    assert_block(make().collect_model_output(chunks), ReasonCode.INVALID_ENVELOPE)
+    assert_block(
+        make().collect_model_output(chunks, request_id="r1"),
+        ReasonCode.INVALID_ENVELOPE,
+    )
+
+
+@pytest.mark.parametrize("request_id", ["", None, 5, ["r"]])
+def test_invalid_model_output_request_id_blocks(request_id):
+    assert_block(
+        make().collect_model_output(["hello"], request_id=request_id),
+        ReasonCode.INVALID_ENVELOPE,
+    )
 
 
 def test_failing_model_stream_blocks():
@@ -82,7 +93,7 @@ def test_failing_model_stream_blocks():
         yield "partial answer "
         raise ConnectionError("model stream dropped")
 
-    assert_block(make().collect_model_output(stream()))
+    assert_block(make().collect_model_output(stream(), request_id="r1"))
 
 
 @pytest.mark.parametrize(
@@ -137,7 +148,8 @@ def test_audit_failure_on_model_output_blocks():
         raise RuntimeError("sink down")
 
     assert_block(
-        make(event_sink=sink).collect_model_output(["hello"]), ReasonCode.AUDIT_ERROR
+        make(event_sink=sink).collect_model_output(["hello"], request_id="r1"),
+        ReasonCode.AUDIT_ERROR,
     )
 
 
@@ -192,4 +204,6 @@ def test_fuzz_inspect_and_collect_are_total():
         if decision.action is not Action.BLOCK:
             assert isinstance(decision.safe_text, str)
         chunks = _random_value(rng)
-        assert isinstance(pipeline.collect_model_output(chunks), Decision)
+        assert isinstance(
+            pipeline.collect_model_output(chunks, request_id="r1"), Decision
+        )
