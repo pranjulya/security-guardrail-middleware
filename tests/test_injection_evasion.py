@@ -179,3 +179,22 @@ def test_worst_case_scan_time_is_bounded(text: str) -> None:
     except InjectionScanLimit:
         pass
     assert time.perf_counter() - started < 1.0
+
+
+def test_example_assistant_fails_closed_on_scan_limit() -> None:
+    """The synthetic example must not crash when normalisation exceeds the cap."""
+    import importlib.util
+    from pathlib import Path
+
+    from guardrails.pii import PiiRedactor
+    from guardrails.policy import DEFAULT_POLICY, load_policy
+
+    path = Path(__file__).resolve().parents[1] / "examples" / "synthetic_assistant.py"
+    spec = importlib.util.spec_from_file_location("synthetic_assistant", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy = load_policy(DEFAULT_POLICY)
+    redactor = PiiRedactor(entities=policy.entities, detector=lambda t, lang, ents: [])
+    result = module.run_turn("\ufdfa" * 5000, policy, "host", redactor)
+    assert result == {"action": "BLOCK", "reason": "LIMIT_EXCEEDED"}

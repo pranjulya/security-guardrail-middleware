@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from guardrails.contracts import ReasonCode
-from guardrails.injection import detect
+from guardrails.injection import InjectionScanLimit, detect
 from guardrails.pii import DetectorFailure, PiiRedactor
 from guardrails.policy import PolicySnapshot
 from guardrails.tools import CatalogTool, ToolDenied, authorize_and_dispatch
@@ -18,7 +18,10 @@ def run_turn(
     model_reply: str = "Here is your catalog summary.",
     proposed_tool: dict | None = None,
 ) -> dict:
-    findings = detect(user_text, policy.rules)
+    try:
+        findings = detect(user_text, policy.rules)
+    except InjectionScanLimit:  # normalised text too large to scan: fail closed
+        return {"action": "BLOCK", "reason": ReasonCode.LIMIT_EXCEEDED.value}
     if findings:
         return {
             "action": "BLOCK",
