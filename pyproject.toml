@@ -57,9 +57,9 @@ ignore = ["UP042"]
 # Confusable/homoglyph tables and evasion fixtures are intentionally non-ASCII.
 "src/guardrails/injection.py" = ["RUF001", "RUF003"]
 "tests/test_injection*.py" = ["RUF001", "RUF003"]
-"tools/**" = ["S311"]
+"tools/**" = ["S311", "RUF001", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["src", "examples"]
+files = ["src", "examples", "tools"]

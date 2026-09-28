@@ -332,6 +332,14 @@ class PiiRedactor:
             raise DetectorFailure() from exc
         return valid
 
+    def detect(self, text: str) -> list[DetectedSpan]:
+        """Public detection API: above-threshold spans in original-text offsets.
+
+        Same normalisation, validation and thresholds as ``redact``; raises
+        DetectorFailure. Intended for evaluation/calibration tooling.
+        """
+        return self._detect(text)
+
     def warm_up(self) -> None:
         """Load the detector/model and run one analysis; raises DetectorFailure."""
         self._detect(WARM_UP_TEXT)

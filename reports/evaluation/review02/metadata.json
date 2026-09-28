@@ -1,0 +1,23 @@
+{
+  "detector": "presidio-analyzer==2.2.360/en_core_web_lg==3.8.0",
+  "fixture_sha256": {
+    "benign": "b5db9ba74bf4647fa2e73058c670252818f015c742ea4a5d78dffac079cb850a",
+    "injection": "ce574e3d66f7d721e3bd671969736c180cda7d7fcefe4a403f8b56816310b099",
+    "obfuscated": "02016940a50ecf4aa60be99bd55700a12eff23918f61128a9473ba62246ad992",
+    "pii": "e7d43de1d3f6edf73224c5f546f57a0fd3a61995d4cd97d7841de7478f69560e"
+  },
+  "fixtures": {
+    "benign": "tests/fixtures/eval/benign.jsonl",
+    "injection": "tests/fixtures/eval/injection.jsonl",
+    "obfuscated": "tests/fixtures/eval/pii-obfuscated.jsonl",
+    "pii": "tests/fixtures/eval/pii-heldout.jsonl"
+  },
+  "honesty": "Fixtures are author-written after reading the detectors; they are NOT independent held-out data and will overstate real accuracy. No real model run: end-to-end attack prevention is UNMEASURED.",
+  "platform": "Linux-6.12.94+-x86_64-with-glibc2.41",
+  "policy_digest": "ae230164b8b681685526930bd21a258e6320870773b0a56486e8a7eab3d00fb1",
+  "policy_id": "v1.1@ae230164b8b68168",
+  "policy_version": "v1.1",
+  "python": "3.12.14",
+  "repeats": 30,
+  "run_id": "review02"
+}

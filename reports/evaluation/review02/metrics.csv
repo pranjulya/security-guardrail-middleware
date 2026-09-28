@@ -1,0 +1,5 @@
+entity,tp,fp,fn,positives,precision,recall,precision_lo,precision_hi,recall_lo,recall_hi
+CREDIT_CARD,140,0,0,140,1.0,1.0,0.9733,1.0,0.9733,1.0
+EMAIL_ADDRESS,150,0,0,150,1.0,1.0,0.975,1.0,0.975,1.0
+PERSON,154,1,6,160,0.9935,0.9625,0.9644,0.9989,0.9206,0.9827
+PHONE_NUMBER,140,0,0,140,1.0,1.0,0.9733,1.0,0.9733,1.0
