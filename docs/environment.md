@@ -8,7 +8,7 @@ Date: 2026-09-25. Machine: darwin arm64, local dev host.
 
 | Component | Version | Origin / license |
 |---|---|---|
-| Python | 3.12.13 (`/Users/pranjulyabajpai/.local/bin/python3.12`, venv `.venv`) | python.org / PSF |
+| Python | 3.12.13 (user-local `python3.12`, venv `.venv`) | python.org / PSF |
 | presidio-analyzer | 2.2.360 (PyPI) | MIT, https://github.com/Microsoft/presidio (now data-privacy-stack) |
 | spacy | 3.8.16 (PyPI) | MIT, Explosion |
 | en_core_web_lg | 3.8.0 (`python -m spacy download en_core_web_lg`) | MIT, Explosion |
