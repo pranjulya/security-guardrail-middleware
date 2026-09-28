@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -34,6 +35,28 @@ class DetectorFailure(Exception):
     pass
 
 
+# Presidio logs analysed text at DEBUG ("Context list is: <raw text>"). A host
+# that enables DEBUG logging must not receive payloads (review 02, M2), so the
+# analyzer loggers are pinned at WARNING and filtered below WARNING.
+_PRESIDIO_LOGGERS = ("presidio-analyzer", "presidio_analyzer")
+
+
+class _DropBelowWarning(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno >= logging.WARNING
+
+
+def quiet_detector_loggers() -> None:
+    """Pin third-party detector loggers at WARNING (idempotent)."""
+    for name in _PRESIDIO_LOGGERS:
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.WARNING)
+        if not any(isinstance(f, _DropBelowWarning) for f in logger.filters):
+            logger.addFilter(_DropBelowWarning())
+
+
+quiet_detector_loggers()
+
 _ENGINE: Any = None
 _ENGINE_LOCK = threading.Lock()
 
@@ -55,6 +78,7 @@ def _get_engine() -> Any:
             from presidio_analyzer import AnalyzerEngine
 
             _ENGINE = AnalyzerEngine()
+            quiet_detector_loggers()  # in case the import reconfigured them
         return _ENGINE
 
 
