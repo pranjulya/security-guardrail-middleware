@@ -15,6 +15,7 @@ from .contracts import (
     RequestBudget,
     validate_envelope,
 )
+from .injection import InjectionScanLimit
 from .injection import detect as detect_injection
 from .pii import DetectorFailure, PiiRedactor
 from .policy import PolicySnapshot
@@ -100,6 +101,11 @@ class Pipeline:
         findings_start = self.clock_ms()
         try:
             findings = detect_injection(envelope.text, self.policy.rules)
+        except InjectionScanLimit:
+            return self._finish(
+                self._block((ReasonCode.LIMIT_EXCEEDED,), start),
+                boundary, byte_len, envelope.request_id, rule_ids,
+            )
         finally:
             self._stage_debit(findings_start)
         if self._remaining_ms < 0:

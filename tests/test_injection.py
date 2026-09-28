@@ -44,7 +44,9 @@ def test_benign_text_not_blocked():
 
 def test_no_recursive_decoding_or_runaway():
     assert not is_blocked("ignore " * 5000, POLICY.rules)
-    assert len(normalized_view("x" * (16 * 1024 + 100))) == 16 * 1024
+    # Review 02: the normalised view is no longer truncated (truncation after NFKC
+    # expansion was a bypass); limits are enforced after normalisation instead.
+    assert len(normalized_view("x" * (16 * 1024 + 100))) == 16 * 1024 + 100
 
 
 def test_simultaneous_rules_report_every_rule_id():
