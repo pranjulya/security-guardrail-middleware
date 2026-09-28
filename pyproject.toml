@@ -9,6 +9,7 @@ description = "Small auditable Python guardrail pipeline (planning: phase 00 bas
 readme = "Implementation.md"
 requires-python = "==3.12.*"
 license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "presidio-analyzer==2.2.360",
     "spacy==3.8.16",

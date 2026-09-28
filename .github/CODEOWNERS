@@ -1,0 +1,5 @@
+# Review 02 (L10): every change needs the maintainer's review.
+*                    @pranjulya
+/src/guardrails/     @pranjulya
+/.github/            @pranjulya
+/docs/architecture/ADRs/ @pranjulya

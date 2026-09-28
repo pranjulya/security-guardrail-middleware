@@ -88,3 +88,43 @@ def test_lock_file_pins_everything_with_hashes() -> None:
     assert "cryptography" not in names
     for dep in ("presidio-analyzer==2.2.360", "spacy==3.8.16", "pytest==9.1.1"):
         assert re.search(rf"^{re.escape(dep)} ", text, flags=re.M), dep
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_license_file_matches_declared_mit_license() -> None:
+    """L10: the MIT license declared in pyproject ships as a LICENSE file."""
+    assert PYPROJECT["project"]["license"] == "MIT"
+    assert PYPROJECT["project"]["license-files"] == ["LICENSE"]
+    text = (ROOT / "LICENSE").read_text()
+    assert text.startswith("MIT License")
+    assert "Permission is hereby granted, free of charge" in text
+
+
+def test_governance_files_present() -> None:
+    """L10: disclosure policy, code owners and contribution guide exist."""
+    security = (ROOT / "SECURITY.md").read_text()
+    assert "Reporting a vulnerability" in security
+    assert "do not open a public issue" in security
+    owners = (ROOT / ".github" / "CODEOWNERS").read_text()
+    assert re.search(r"^\*\s+@pranjulya$", owners, re.MULTILINE)
+    assert "Synthetic data only" in (ROOT / "CONTRIBUTING.md").read_text()
+
+
+def test_built_wheel_contains_license_and_type_marker(tmp_path) -> None:
+    """The wheel carries LICENSE (PEP 639) and py.typed (PEP 561)."""
+    import subprocess
+    import sys
+    import zipfile
+
+    subprocess.run(
+        [sys.executable, "-m", "pip", "wheel", "--no-deps", "-q", "-w", str(tmp_path), str(ROOT)],
+        check=True,
+        capture_output=True,
+        timeout=300,
+    )
+    wheel = next(tmp_path.glob("security_guardrail_middleware-*.whl"))
+    names = zipfile.ZipFile(wheel).namelist()
+    assert any(n.endswith(".dist-info/licenses/LICENSE") for n in names), names
+    assert "guardrails/py.typed" in names
