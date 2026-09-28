@@ -36,7 +36,7 @@ are **not** independent held-out data; treat the numbers as optimistic.
   a leak of that name. No threshold change fixes a NER miss.
 - EMAIL / PHONE / CARD recall 1.0 on this set (CI lower bounds ~0.97).
 
-### PHONE / PERSON false-positive trade-off (L1) — pending owner acceptance
+### PHONE / PERSON false-positive trade-off (L1) — accepted (option 1)
 
 The PHONE threshold (0.4) equals Presidio's base phone score, so every number
 the phone recognizer accepts is redacted. On the benign set, 19/200 texts
@@ -56,5 +56,6 @@ for precision on a privacy control):
 3. Add a deny-list / validation recognizer for known product names and ID
    formats used by the host application.
 
-Until the owner accepts option 1 in writing, L1 is tracked as *documented,
-not resolved*.
+**Decision (2026-09-28): the owner accepted option 1.** The PHONE threshold stays
+at 0.4, and over-redaction of numeric IDs and some product names is accepted in
+exchange for phone recall. L1 is resolved.
