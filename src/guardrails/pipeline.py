@@ -9,7 +9,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .audit import build_event, safe_boundary, safe_request_id
+from .audit import build_event, build_tool_event, safe_boundary, safe_request_id
 from .contracts import (
     Action,
     Decision,
@@ -24,6 +24,14 @@ from .injection import InjectionScanLimit
 from .injection import detect as detect_injection
 from .pii import DetectorFailure, PiiRedactor
 from .policy import PolicyError, PolicySnapshot
+from .tools import (
+    CATALOG_TOOL,
+    CatalogTool,
+    Entitlements,
+    ToolBudget,
+    ToolDenied,
+    authorize,
+)
 
 SAFE_REFUSAL = "Cannot safely process this request."
 
@@ -46,6 +54,8 @@ class Pipeline:
     def __post_init__(self) -> None:
         if self.max_tracked_requests <= 0:
             raise ValueError("max_tracked_requests must be positive")
+        if type(self.max_tool_invocations) is not int or self.max_tool_invocations < 0:
+            raise ValueError("max_tool_invocations must be a non-negative int")
         # The policy is authoritative (review 02, M4): a redactor whose
         # entities/thresholds disagree with the policy must not be able to
         # release text while decisions claim that policy's version and digest.
@@ -97,6 +107,7 @@ class Pipeline:
                         max_bytes=self.policy.max_aggregate_bytes,
                     ),
                     remaining_ms=self.policy.inspection_budget_ms,
+                    tools=ToolBudget(max_invocations=self.max_tool_invocations),
                 )
                 self._states[request_id] = state
                 # Bounded memory: evict the least recently used request. Hosts
@@ -274,6 +285,56 @@ class Pipeline:
             )
         return self._finish(decision, boundary, byte_len, envelope.request_id, rule_ids)
 
+    def dispatch_tool(
+        self,
+        proposal: object,
+        *,
+        request_id: str,
+        session_principal: str,
+        catalog: CatalogTool | None = None,
+        entitlements: Entitlements | None = None,
+    ) -> dict[str, Any]:
+        """Authorize a model tool proposal with host session state, then dispatch.
+
+        Enforces ``max_tool_invocations`` per request and emits a content-free
+        ``tool_decision`` event on every path (M7). Raises ToolDenied; a denied
+        or unaudited proposal is never dispatched. The result is tool output:
+        inspect it with ``boundary="tool_output"`` before giving it to a model.
+        """
+        raw_tool = proposal.get("tool") if isinstance(proposal, Mapping) else None
+        try:
+            if not is_valid_request_id(request_id):
+                raise ToolDenied("bad-proposal")
+            call = authorize(
+                proposal, session_principal=session_principal, entitlements=entitlements
+            )
+            self._state_for(request_id).tools.consume()
+        except ToolDenied as exc:
+            try:
+                self._emit_tool(request_id, raw_tool, "DENY", exc.detail)
+            except Exception:  # noqa: BLE001 - denial stands even if audit fails
+                self.sink_failures += 1
+            raise
+        try:
+            self._emit_tool(request_id, call.tool, "ALLOW", "ok")
+        except Exception:  # noqa: BLE001 - no audit record, no dispatch
+            self.sink_failures += 1
+            raise ToolDenied("audit-error") from None
+        return (catalog or CatalogTool()).lookup(item_id=call.item_id, quantity=call.quantity)
+
+    def _emit_tool(self, request_id: object, tool: object, outcome: str, detail: str) -> None:
+        sink = self.event_sink
+        if sink is None:
+            return
+        event = build_tool_event(
+            request_id=request_id,
+            tool=tool if tool == CATALOG_TOOL else None,
+            outcome=outcome,
+            detail=detail,
+            policy_id=self.policy.policy_id,
+        )
+        sink(event.to_dict())
+
     def collect_model_output(self, chunks: Iterable[str], *, request_id: str) -> Decision:
         """Buffer model output for ``request_id`` privately, then inspect.
 
@@ -442,6 +503,7 @@ class Pipeline:
 class _RequestState:
     budget: RequestBudget
     remaining_ms: int
+    tools: ToolBudget = field(default_factory=ToolBudget)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     def consume(self, byte_len: int) -> None:

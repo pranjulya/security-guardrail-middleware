@@ -78,7 +78,7 @@ def test_unauthorized_tool_denied_zero_dispatch():
     catalog = CatalogTool()
     try:
         authorize_and_dispatch(
-            {"tool": "http_fetch", "arguments": {}, "principal": TRUSTED}, TRUSTED, catalog
+            {"tool": "http_fetch", "arguments": {}}, session_principal=TRUSTED, catalog=catalog
         )
         raise AssertionError("should deny")
     except ToolDenied:
@@ -95,8 +95,8 @@ def test_forged_principal_denied():
                 "arguments": {"item_id": "item-001"},
                 "principal": "model-admin",
             },
-            TRUSTED,
-            catalog,
+            session_principal=TRUSTED,
+            catalog=catalog,
         )
         raise AssertionError("should deny")
     except ToolDenied:

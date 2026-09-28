@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .contracts import Action, Boundary, ReasonCode, is_valid_policy_id, is_valid_request_id
+from .tools import CATALOG_TOOL, DENIAL_DETAILS
 
 _ALLOWED_KEYS = frozenset(
     {
@@ -169,4 +170,52 @@ def build_event(
         detector_versions=dict(detector_versions or {}),
         elapsed_ms=max(0, int(elapsed_ms)),
         byte_bucket=byte_bucket(text_byte_len),
+    )
+
+
+_TOOL_EVENT_KEYS = frozenset({"event", "request_id", "tool", "outcome", "detail", "policy_id"})
+
+
+@dataclass(frozen=True)
+class ToolEvent:
+    """Content-free record of every tool authorization decision (M7)."""
+
+    request_id: str
+    tool: str
+    outcome: str
+    detail: str
+    policy_id: str = ""
+
+    def __post_init__(self) -> None:
+        _check(
+            self.request_id in (INVALID, UNKNOWN) or is_valid_request_id(self.request_id),
+            "request_id",
+        )
+        _check(self.tool in (CATALOG_TOOL, UNKNOWN), "tool")
+        _check(self.outcome in ("ALLOW", "DENY"), "outcome")
+        _check(self.detail in DENIAL_DETAILS | {"ok"}, "detail")
+        _check(self.policy_id == "" or is_valid_policy_id(self.policy_id), "policy_id")
+
+    def to_dict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "event": "tool_decision",
+            "request_id": self.request_id,
+            "tool": self.tool,
+            "outcome": self.outcome,
+            "detail": self.detail,
+            "policy_id": self.policy_id,
+        }
+        _check(set(data) <= _TOOL_EVENT_KEYS, "keys")
+        return data
+
+
+def build_tool_event(
+    *, request_id: object, tool: object, outcome: str, detail: str, policy_id: str = ""
+) -> ToolEvent:
+    return ToolEvent(
+        request_id=safe_request_id(request_id),
+        tool=CATALOG_TOOL if tool == CATALOG_TOOL else UNKNOWN,
+        outcome=outcome,
+        detail=detail if detail in DENIAL_DETAILS | {"ok"} else "denied",
+        policy_id=policy_id,
     )

@@ -36,7 +36,9 @@ def run_turn(
     tool_result = None
     if proposed_tool is not None:
         try:
-            tool_result = authorize_and_dispatch(proposed_tool, trusted_principal, catalog)
+            tool_result = authorize_and_dispatch(
+                proposed_tool, session_principal=trusted_principal, catalog=catalog
+            )
         except ToolDenied:
             return {
                 "action": "BLOCK",
