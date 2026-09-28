@@ -12,13 +12,27 @@ Hardening (review 02):
   slow clients cannot starve the detector pool.
 * The number of open connections (and therefore handler threads) is capped
   before authentication; excess connections receive 503 and are closed.
+* Every response carries ``Cache-Control: no-store``,
+  ``X-Content-Type-Options: nosniff`` and ``X-Request-Id``; 401 carries
+  ``WWW-Authenticate: Bearer`` (L3).
+* The token must be >= 32 characters with no whitespace/control characters;
+  ``python -m guardrails.http`` reads it from ``GUARDRAIL_TOKEN_FILE`` or
+  ``GUARDRAIL_TOKEN``, never from code or argv (L3).
+* Non-string envelope fields -> 400; any ``Transfer-Encoding`` -> 400 (no
+  CL/TE ambiguity behind proxies) (L3).
+* Optional content-free ``event_sink`` receives inspection audit events and one
+  ``http_access`` event per request; ``shutdown_gracefully()`` drains
+  in-flight requests (L3).
 """
 
 from __future__ import annotations
 
+import argparse
 import hmac
 import json
 import logging
+import os
+import signal
 import socket
 import sys
 import threading
@@ -30,13 +44,17 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .contracts import ReasonCode
-from .pipeline import Pipeline
+from .pipeline import EventSink, Pipeline
 
 MAX_WIRE_BYTES = 17 * 1024
 ADMISSION_WAIT_SECONDS = 0.05
 SOCKET_TIMEOUT_SECONDS = 5
 READ_DEADLINE_SECONDS = 10.0
 MAX_CONNECTIONS = 32
+MIN_TOKEN_CHARS = 32
+AUTH_ENV_VAR = "GUARDRAIL_TOKEN"
+AUTH_FILE_ENV_VAR = "GUARDRAIL_TOKEN_FILE"
+_ROUTES = ("/v1/inspect", "/healthz")
 
 PipelineFactory = Callable[[], Pipeline]
 
@@ -44,6 +62,8 @@ _LOG = logging.getLogger("guardrails.http")
 _REJECT_RESPONSE = (
     b"HTTP/1.1 503 Service Unavailable\r\n"
     b"Content-Type: application/json\r\n"
+    b"Cache-Control: no-store\r\n"
+    b"X-Content-Type-Options: nosniff\r\n"
     b"Content-Length: 24\r\n"
     b"Connection: close\r\n\r\n"
     b'{"code": "OVERLOADED"}\r\n'
@@ -60,10 +80,20 @@ class ServerConfig:
     warm_up: bool = True
     max_connections: int = MAX_CONNECTIONS
     read_deadline_seconds: float = READ_DEADLINE_SECONDS
+    #: Content-free audit sink: receives the pipeline's inspection events and
+    #: one ``http_access`` event per request. A failing sink turns inspection
+    #: into 503 AUDIT_UNAVAILABLE (fail closed).
+    event_sink: EventSink | None = None
 
     def __post_init__(self) -> None:
-        if not self.auth_token:
+        if not isinstance(self.auth_token, str) or not self.auth_token:
             raise ValueError("auth token required")
+        if len(self.auth_token) < MIN_TOKEN_CHARS:
+            raise ValueError(f"auth token must be at least {MIN_TOKEN_CHARS} characters")
+        if any(c.isspace() or not c.isprintable() for c in self.auth_token):
+            raise ValueError("auth token must not contain whitespace or control characters")
+        if type(self.max_concurrent) is not int or type(self.max_connections) is not int:
+            raise ValueError("max_concurrent and max_connections must be ints")
         if self.host not in ("127.0.0.1", "::1", "localhost"):
             raise ValueError("loopback host only; public hosting needs separate approval")
         if self.max_concurrent <= 0 or self.max_connections <= 0:
@@ -141,6 +171,9 @@ class GuardrailHTTPServer(ThreadingHTTPServer):
     ) -> None:
         self.read_deadline_seconds = read_deadline_seconds
         self.rejected_connections = 0
+        self.draining = False
+        self._active = 0
+        self._active_cond = threading.Condition()
         self._connection_slots = threading.BoundedSemaphore(max_connections)
         self.watchdog = _Watchdog()
         super().__init__(server_address, handler)
@@ -157,10 +190,13 @@ class GuardrailHTTPServer(ThreadingHTTPServer):
                 pass
             self.shutdown_request(request)
             return
+        with self._active_cond:
+            self._active += 1
         try:
             super().process_request(request, client_address)
         except Exception:
             self._connection_slots.release()
+            self._done()
             self.shutdown_request(request)
             raise
 
@@ -169,6 +205,39 @@ class GuardrailHTTPServer(ThreadingHTTPServer):
             super().process_request_thread(request, client_address)
         finally:
             self._connection_slots.release()
+            self._done()
+
+    def _done(self) -> None:
+        with self._active_cond:
+            self._active -= 1
+            self._active_cond.notify_all()
+
+    @property
+    def active_connections(self) -> int:
+        with self._active_cond:
+            return self._active
+
+    def shutdown_gracefully(self, timeout: float = 10.0) -> bool:
+        """Stop accepting, let in-flight requests finish, then close.
+
+        Must be called from a thread other than the one running
+        ``serve_forever``. New requests on already-accepted connections get 503
+        while draining. Returns True if every in-flight request finished within
+        ``timeout`` seconds (remaining daemon threads are abandoned otherwise).
+        """
+        self.draining = True
+        self.ready = False
+        self.shutdown()
+        deadline = time.monotonic() + max(0.0, timeout)
+        with self._active_cond:
+            while self._active > 0:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                self._active_cond.wait(left)
+            drained = self._active == 0
+        self.server_close()
+        return drained
 
     def handle_error(self, request: Any, client_address: Any) -> None:
         # Content-free: never print tracebacks (which may quote request data).
@@ -195,6 +264,9 @@ class _Handler(BaseHTTPRequestHandler):
 
     deadline_expired = False
     _watch_token: int | None = None
+    _request_id: str = ""
+    _started: float = 0.0
+    _status: int = 0
 
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -203,6 +275,8 @@ class _Handler(BaseHTTPRequestHandler):
     def setup(self) -> None:
         super().setup()
         self.deadline_expired = False
+        self._request_id = uuid.uuid4().hex
+        self._started = time.monotonic()
         self._watch_token = self.server.watchdog.register(
             self.connection, time.monotonic() + self.server.read_deadline_seconds, self
         )
@@ -224,11 +298,46 @@ class _Handler(BaseHTTPRequestHandler):
             super().finish()
         except OSError:
             pass
+        self._access_event()
+
+    def _access_event(self) -> None:
+        sink = self.config.event_sink
+        if sink is None or not self._status:
+            return
+        method = self.command if self.command in ("GET", "POST") else "other"
+        path = (self.path or "").split("?", 1)[0]
+        try:
+            sink(
+                {
+                    "event": "http_access",
+                    "request_id": self._request_id,
+                    "method": method,
+                    "route": path if path in _ROUTES else "other",
+                    "status": int(self._status),
+                    "elapsed_ms": int((time.monotonic() - self._started) * 1000),
+                }
+            )
+        except Exception:  # noqa: BLE001 - access log is best effort; audit is not
+            _LOG.error("guardrail-http: access event sink failed")
+
+    def send_response(self, code: int, message: str | None = None) -> None:
+        self._status = code
+        super().send_response(code, message)
+
+    def end_headers(self) -> None:
+        # Applied to every response, including BaseHTTPRequestHandler errors.
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if self._request_id:
+            self.send_header("X-Request-Id", self._request_id)
+        super().end_headers()
 
     # -- helpers --------------------------------------------------------------
     def _send(self, status: int, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, sort_keys=True).encode("utf-8")
         self.send_response(status)
+        if status == 401:
+            self.send_header("WWW-Authenticate", 'Bearer realm="guardrail"')
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Connection", "close")
@@ -278,6 +387,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_safely(500, {"code": "INTERNAL_ERROR"})
 
     def _do_post(self) -> None:
+        if getattr(self.server, "draining", False):
+            self._end_read_phase()
+            self._send_safely(503, {"code": "SHUTTING_DOWN"})
+            return
         if self.path != "/v1/inspect":
             self._end_read_phase()
             self._send_safely(404, {"code": "NOT_FOUND"})
@@ -289,6 +402,14 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._ready():
             self._end_read_phase()
             self._send_safely(503, {"code": "NOT_READY"})
+            return
+        # Any Transfer-Encoding (alone or with Content-Length) is refused: only
+        # a single, unambiguous Content-Length framing is accepted.
+        if self.headers.get("Transfer-Encoding") is not None or (
+            len(self.headers.get_all("Content-Length") or []) > 1
+        ):
+            self._end_read_phase()
+            self._send_safely(400, {"code": "BAD_REQUEST"})
             return
         length_header = self.headers.get("Content-Length")
         try:
@@ -328,14 +449,18 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_safely(400, {"code": "BAD_REQUEST"})
             return
         for value in data.values():
-            if isinstance(value, str):
-                try:
-                    value.encode("utf-8")
-                except UnicodeEncodeError:  # e.g. escaped lone surrogate "\ud800"
-                    self._send_safely(400, {"code": "BAD_JSON"})
-                    return
+            if not isinstance(value, str):  # LLD: wrong field type is a 400
+                self._send_safely(400, {"code": "BAD_REQUEST"})
+                return
+            try:
+                value.encode("utf-8")
+            except UnicodeEncodeError:  # e.g. escaped lone surrogate "\ud800"
+                self._send_safely(400, {"code": "BAD_JSON"})
+                return
         pipeline = self.config.pipeline_factory()
-        request_id = uuid.uuid4().hex
+        if self.config.event_sink is not None and pipeline.event_sink is None:
+            pipeline.event_sink = self.config.event_sink
+        request_id = self._request_id
         try:
             decision = pipeline.inspect(
                 {
@@ -356,6 +481,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_safely(503, {"code": "AUDIT_UNAVAILABLE"})
                 return
         payload = decision.to_public_dict()
+        payload["request_id"] = request_id
         if decision.safe_text is not None:
             payload["safe_text"] = decision.safe_text
         self._send_safely(200, payload)
@@ -393,3 +519,78 @@ def create_server(config: ServerConfig) -> GuardrailHTTPServer:
     server.warm_up_ms = warm_up_ms
     server.ready = ready
     return server
+
+
+def load_token(environ: Any = None) -> str:
+    """Read the bearer token from GUARDRAIL_TOKEN_FILE (preferred) or GUARDRAIL_TOKEN."""
+    env = os.environ if environ is None else environ
+    path = env.get(AUTH_FILE_ENV_VAR)
+    if path:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read().strip()
+    token = env.get(AUTH_ENV_VAR, "")
+    if not token:
+        raise ValueError(f"set {AUTH_FILE_ENV_VAR} or {AUTH_ENV_VAR}")
+    return str(token)
+
+
+def _stderr_audit_sink(event: dict[str, Any]) -> None:
+    logging.getLogger("guardrails.audit").info(json.dumps(event, sort_keys=True))
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m guardrails.http``: loopback server, token from the environment."""
+    parser = argparse.ArgumentParser(prog="python -m guardrails.http")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--max-concurrent", type=int, default=8)
+    parser.add_argument("--drain-seconds", type=float, default=10.0)
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
+    try:
+        token = load_token()
+    except (OSError, ValueError) as exc:
+        print(f"guardrails.http: {type(exc).__name__}: token not configured", file=sys.stderr)
+        return 2
+    from .policy import DEFAULT_POLICY, load_policy
+
+    policy = load_policy(DEFAULT_POLICY)
+
+    def factory() -> Pipeline:
+        return Pipeline.from_policy(policy)
+
+    try:
+        config = ServerConfig(
+            auth_token=token,
+            pipeline_factory=factory,
+            host=args.host,
+            port=args.port,
+            max_concurrent=args.max_concurrent,
+            max_connections=max(MAX_CONNECTIONS, args.max_concurrent),
+            event_sink=_stderr_audit_sink,
+        )
+    except ValueError as exc:
+        print(f"guardrails.http: invalid configuration: {exc}", file=sys.stderr)
+        return 2
+    server = create_server(config)
+    stop = threading.Event()
+
+    def _on_signal(signum: int, frame: Any) -> None:
+        stop.set()
+
+    signal.signal(signal.SIGTERM, _on_signal)
+    signal.signal(signal.SIGINT, _on_signal)
+    thread = threading.Thread(target=server.serve_forever, name="guardrail-http", daemon=True)
+    thread.start()
+    print(
+        f"guardrails.http listening on {args.host}:{server.server_address[1]} ready={server.ready}",
+        file=sys.stderr,
+        flush=True,
+    )
+    stop.wait()
+    drained = server.shutdown_gracefully(args.drain_seconds)
+    return 0 if drained else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

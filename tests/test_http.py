@@ -16,7 +16,7 @@ from guardrails.pipeline import Pipeline
 from guardrails.policy import DEFAULT_POLICY, load_policy
 
 POLICY = load_policy(DEFAULT_POLICY)
-TOKEN = "test-token-0123456789"
+TOKEN = "test-token-0123456789-abcdefghijkl"
 
 
 def stub_redactor(fail: bool = False, delay: float = 0.0) -> PiiRedactor:
