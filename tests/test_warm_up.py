@@ -69,7 +69,7 @@ def test_create_server_warms_up_before_reporting_ready():
     def factory():
         return Pipeline(
             policy=POLICY,
-            redactor=PiiRedactor(entities=POLICY.entities, detector=detector),
+            redactor=PiiRedactor.from_policy(POLICY, detector=detector),
         )
 
     server = create_server(ServerConfig(auth_token=TOKEN, pipeline_factory=factory))
@@ -91,7 +91,7 @@ def test_failed_warm_up_is_not_ready_and_refuses_traffic():
     def factory():
         return Pipeline(
             policy=POLICY,
-            redactor=PiiRedactor(entities=POLICY.entities, detector=detector),
+            redactor=PiiRedactor.from_policy(POLICY, detector=detector),
         )
 
     server = _serve(create_server(ServerConfig(auth_token=TOKEN, pipeline_factory=factory)))

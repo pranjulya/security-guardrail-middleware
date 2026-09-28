@@ -23,9 +23,7 @@ VALID = json.dumps({"boundary": "user_input", "language": "en", "text": "hello"}
 def pipeline(detector=None, **kw) -> Pipeline:
     return Pipeline(
         policy=POLICY,
-        redactor=PiiRedactor(
-            entities=POLICY.entities, detector=detector or (lambda t, lang, e: [])
-        ),
+        redactor=PiiRedactor.from_policy(POLICY, detector=detector or (lambda t, lang, e: [])),
         **kw,
     )
 

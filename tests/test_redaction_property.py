@@ -70,6 +70,8 @@ def test_redactor_end_to_end_property_with_stub_detector() -> None:
         def detector(t, lang, entities, _text=text, _spans=spans):
             return list(_spans) if t == _text else []
 
-        out, _, _ = PiiRedactor(entities=ENTITIES, detector=detector).redact(text)
+        out, _, _ = PiiRedactor(
+            entities=ENTITIES, thresholds=dict.fromkeys(ENTITIES, 0.0), detector=detector
+        ).redact(text)
         kept = "".join(ch for ch in out if ch.isdigit())
         assert kept == _expected_kept(text, spans)

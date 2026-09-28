@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -144,18 +145,75 @@ def _presidio_detector(
     return spans
 
 
+def _dist_version(*names: str) -> str:
+    from importlib.metadata import PackageNotFoundError, version
+
+    for name in names:
+        try:
+            return version(name)
+        except PackageNotFoundError:
+            continue
+    return "unknown"
+
+
+def presidio_detector_version() -> str:
+    """Installed analyzer + model versions (review 02, L5: no hard-coded string)."""
+    return (
+        f"presidio-analyzer=={_dist_version('presidio-analyzer')}"
+        f"/en_core_web_lg=={_dist_version('en-core-web-lg', 'en_core_web_lg')}"
+    )
+
+
+def _valid_score(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and 0.0 <= value <= 1.0
+    )
+
+
+def _validated_thresholds(
+    entities: frozenset[str], thresholds: Mapping[str, float] | None
+) -> dict[str, float]:
+    """Every enabled entity needs an explicit, finite threshold in [0, 1] (L6)."""
+    given = dict(thresholds or {})
+    if set(given) != set(entities):
+        raise ValueError("thresholds must be given for exactly the enabled entities")
+    if not all(_valid_score(v) for v in given.values()):
+        raise ValueError("thresholds must be finite numbers in [0, 1]")
+    return {k: float(v) for k, v in given.items()}
+
+
 class PiiRedactor:
     def __init__(
         self,
         entities: Iterable[str],
         thresholds: Mapping[str, float] | None = None,
         detector: DetectorFn | None = None,
-        detector_version: str = "presidio-analyzer==2.2.360/en_core_web_lg==3.8.0",
+        detector_version: str | None = None,
     ) -> None:
         self.entities = frozenset(entities)
-        self.thresholds = dict(thresholds or {})
+        self.thresholds = _validated_thresholds(self.entities, thresholds)
         self._detector = detector or _presidio_detector
+        if detector_version is None:
+            detector_version = presidio_detector_version() if detector is None else "custom"
         self.detector_version = detector_version
+
+    @classmethod
+    def from_policy(
+        cls,
+        policy: Any,
+        detector: DetectorFn | None = None,
+        detector_version: str | None = None,
+    ) -> PiiRedactor:
+        """Build a redactor whose entities/thresholds are exactly the policy's."""
+        return cls(
+            entities=policy.entities,
+            thresholds=dict(policy.thresholds),
+            detector=detector,
+            detector_version=detector_version,
+        )
 
     def _detect(self, text: str, entities: Iterable[str] | None = None) -> list[DetectedSpan]:
         wanted = list(entities) if entities is not None else sorted(self.entities)
@@ -166,16 +224,24 @@ class PiiRedactor:
         except Exception as exc:
             raise DetectorFailure() from exc
         valid = []
-        for s in spans:
-            if s.entity_type not in self.entities:
-                continue
-            if not isinstance(s.start, int) or not isinstance(s.end, int):
-                raise DetectorFailure()
-            if s.start < 0 or s.end <= s.start or s.end > len(text):
-                raise DetectorFailure()
-            threshold = self.thresholds.get(s.entity_type, 0.0)
-            if s.score >= threshold:
-                valid.append(s)
+        try:
+            for s in spans:
+                if s.entity_type not in self.entities:
+                    continue
+                if type(s.start) is not int or type(s.end) is not int:
+                    raise DetectorFailure()
+                if s.start < 0 or s.end <= s.start or s.end > len(text):
+                    raise DetectorFailure()
+                # A NaN / non-numeric / out-of-range score is a detector fault,
+                # not a silent miss (L6): fail closed.
+                if not _valid_score(s.score):
+                    raise DetectorFailure()
+                if s.score >= self.thresholds[s.entity_type]:
+                    valid.append(s)
+        except DetectorFailure:
+            raise
+        except Exception as exc:
+            raise DetectorFailure() from exc
         return valid
 
     def warm_up(self) -> None:

@@ -27,10 +27,8 @@ POLICY = load_policy(DEFAULT_POLICY)
 
 
 def make(detector=None, **kw) -> Pipeline:
-    redactor = PiiRedactor(
-        entities=POLICY.entities,
-        detector=detector or (lambda t, lang, e: []),
-        detector_version="stub",
+    redactor = PiiRedactor.from_policy(
+        POLICY, detector=detector or (lambda t, lang, e: []), detector_version="stub"
     )
     return Pipeline(policy=POLICY, redactor=redactor, **kw)
 

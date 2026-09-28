@@ -134,7 +134,7 @@ def test_oversize_after_normalisation_fails_closed() -> None:
 
 
 def test_pipeline_maps_scan_limit_to_block_limit_exceeded() -> None:
-    redactor = PiiRedactor(entities=POLICY.entities, detector=lambda t, lang, e: [])
+    redactor = PiiRedactor.from_policy(POLICY, detector=lambda t, lang, e: [])
     decision = Pipeline(policy=POLICY, redactor=redactor).inspect(
         {
             "boundary": "retrieved_content",
@@ -194,6 +194,6 @@ def test_example_assistant_fails_closed_on_scan_limit() -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     policy = load_policy(DEFAULT_POLICY)
-    redactor = PiiRedactor(entities=policy.entities, detector=lambda t, lang, ents: [])
+    redactor = PiiRedactor.from_policy(policy, detector=lambda t, lang, ents: [])
     result = module.run_turn("\ufdfa" * 5000, policy, "host", redactor)
     assert result == {"action": "BLOCK", "reason": "LIMIT_EXCEEDED"}
