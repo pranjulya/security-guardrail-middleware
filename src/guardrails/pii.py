@@ -44,7 +44,7 @@ WARM_UP_TEXT = (
 )
 
 
-def _get_engine():
+def _get_engine() -> Any:
     """Return the process-wide AnalyzerEngine, creating it exactly once."""
     global _ENGINE
     engine = _ENGINE
@@ -134,7 +134,7 @@ def _precedence(entity_type: str) -> int:
 
 def _replace_union(text: str, spans: list[DetectedSpan]) -> str:
     ordered = sorted(spans, key=lambda s: (s.start, s.end))
-    groups: list[list] = []
+    groups: list[list[Any]] = []
     for span in ordered:
         if groups and span.start < groups[-1][1]:
             groups[-1][1] = max(groups[-1][1], span.end)

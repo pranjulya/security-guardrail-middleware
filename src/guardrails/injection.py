@@ -482,7 +482,9 @@ def _decoded_payloads(folded: str) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
-def _scan(views: list[tuple[str, str]], wanted: set[str] | None, found: dict) -> None:
+def _scan(
+    views: list[tuple[str, str]], wanted: set[str] | None, found: dict[str, InjectionFinding]
+) -> None:
     for rule_id, applies_to, pattern in _COMPILED:
         if rule_id in found or (wanted is not None and rule_id not in wanted):
             continue

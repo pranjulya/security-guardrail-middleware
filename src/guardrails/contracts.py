@@ -77,7 +77,7 @@ class Decision:
         if self.action in (Action.ALLOW, Action.REDACT) and self.safe_text is None:
             raise ValueError("ALLOW/REDACT decisions require safe_text")
 
-    def to_public_dict(self) -> dict:
+    def to_public_dict(self) -> dict[str, Any]:
         return {
             "action": self.action.value,
             "reason_codes": [r.value for r in self.reason_codes],

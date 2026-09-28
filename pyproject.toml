@@ -29,6 +29,9 @@ test = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+guardrails = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -50,3 +53,8 @@ ignore = ["UP042"]
 "src/guardrails/injection.py" = ["RUF001", "RUF003"]
 "tests/test_injection*.py" = ["RUF001", "RUF003"]
 "tools/**" = ["S311"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]

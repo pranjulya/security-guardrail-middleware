@@ -36,14 +36,14 @@ class InspectionEvent:
     request_id: str
     boundary: str
     action: str
-    reason_codes: tuple = ()
-    rule_ids: tuple = ()
+    reason_codes: tuple[str, ...] = ()
+    rule_ids: tuple[str, ...] = ()
     policy_version: str = ""
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
     byte_bucket: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "boundary": self.boundary,

@@ -29,9 +29,9 @@ class ToolProposal:
 
 @dataclass
 class CatalogTool:
-    calls: list = field(default_factory=list)
+    calls: list[dict[str, Any]] = field(default_factory=list)
 
-    def lookup(self, item_id: str, quantity: int = 1) -> dict:
+    def lookup(self, item_id: str, quantity: int = 1) -> dict[str, Any]:
         self.calls.append({"item_id": item_id, "quantity": quantity})
         return {"item_id": item_id, "quantity": quantity, "price_cents": 999}
 
@@ -40,7 +40,7 @@ def authorize_and_dispatch(
     proposal: Mapping[str, Any],
     trusted_principal: str,
     catalog: CatalogTool | None = None,
-) -> dict:
+) -> dict[str, Any]:
     tool = proposal.get("tool") if isinstance(proposal, Mapping) else None
     arguments = proposal.get("arguments") if isinstance(proposal, Mapping) else None
     principal = proposal.get("principal") if isinstance(proposal, Mapping) else None

@@ -41,3 +41,13 @@ def test_model_version_matches_documented_detector_version():
 
 def test_package_is_discoverable_from_src_layout():
     assert PYPROJECT["tool"]["setuptools"]["packages"]["find"]["where"] == ["src"]
+
+
+def test_package_is_marked_typed() -> None:
+    """PEP 561 marker ships with the package (L9/L10)."""
+    import guardrails
+
+    marker = Path(guardrails.__file__).with_name("py.typed")
+    assert marker.is_file()
+    assert "py.typed" in PYPROJECT["tool"]["setuptools"]["package-data"]["guardrails"]
+    assert PYPROJECT["tool"]["mypy"]["strict"] is True

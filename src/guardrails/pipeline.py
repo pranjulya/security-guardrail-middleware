@@ -26,7 +26,7 @@ from .policy import PolicySnapshot
 
 SAFE_REFUSAL = "Cannot safely process this request."
 
-EventSink = Callable[[dict], None]
+EventSink = Callable[[dict[str, Any]], None]
 
 
 @dataclass
@@ -126,7 +126,7 @@ class Pipeline:
         return self._finish(decision, boundary, 0, request_id, ())
 
     def _inspect(self, envelope_data: Any, start: int) -> Decision:
-        rule_ids: tuple = ()
+        rule_ids: tuple[str, ...] = ()
         if not isinstance(envelope_data, Mapping):
             return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start)
         raw_boundary = envelope_data.get("boundary", "")
@@ -328,12 +328,17 @@ class Pipeline:
             }
         )
 
-    def _versions(self) -> dict:
+    def _versions(self) -> dict[str, str]:
         versions = dict(self.detector_versions)
         versions.setdefault("pii", getattr(self.redactor, "detector_version", "unknown"))
         return versions
 
-    def _block(self, reasons: tuple, start: int, extra_versions: Mapping | None = None) -> Decision:
+    def _block(
+        self,
+        reasons: tuple[ReasonCode, ...],
+        start: int,
+        extra_versions: Mapping[str, str] | None = None,
+    ) -> Decision:
         versions = self._versions()
         if extra_versions:
             versions.update(extra_versions)
@@ -351,7 +356,7 @@ class Pipeline:
         boundary: str,
         text_byte_len: int,
         request_id: str,
-        rule_ids: tuple,
+        rule_ids: tuple[str, ...],
     ) -> Decision:
         if self.event_sink is None:
             return decision
@@ -384,7 +389,7 @@ class Pipeline:
         boundary: str,
         text_byte_len: int,
         request_id: str,
-        rule_ids: tuple,
+        rule_ids: tuple[str, ...],
     ) -> None:
         sink = self.event_sink
         if sink is None:
@@ -425,7 +430,7 @@ def _safe_str(value: Any) -> str:
 
 
 class _PipelineBlock(Exception):
-    def __init__(self, reasons: tuple):
+    def __init__(self, reasons: tuple[ReasonCode, ...]):
         super().__init__("pipeline block")
         self.reasons = reasons
 

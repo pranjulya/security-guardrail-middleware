@@ -32,9 +32,9 @@ _MANDATORY_RULE_IDS = frozenset({"block-direct-override", "block-exfiltration"})
 class PolicySnapshot:
     version: str
     digest: str
-    entities: frozenset
-    thresholds: dict
-    rules: tuple
+    entities: frozenset[str]
+    thresholds: dict[str, float]
+    rules: tuple[str, ...]
     max_text_bytes: int = MAX_TEXT_BYTES
     max_aggregate_bytes: int = MAX_AGGREGATE_BYTES
     max_blocks: int = MAX_BLOCKS
