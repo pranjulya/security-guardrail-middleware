@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, TypeGuard
 
 MAX_TEXT_BYTES = 16 * 1024
 MAX_AGGREGATE_BYTES = 64 * 1024
@@ -14,6 +15,21 @@ INSPECTION_BUDGET_MS = 2000
 SUPPORTED_LANGUAGE = "en"
 
 APPROVED_ENTITIES = frozenset({"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"})
+
+
+# Envelope identifiers are bounded and charset-restricted so they are safe to
+# log verbatim (review 02, L8/M1). Anything else is rejected, never logged.
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,64}")
+POLICY_ID_PATTERN = re.compile(r"[A-Za-z0-9._:@+-]{1,128}")
+ENVELOPE_KEYS = frozenset({"boundary", "language", "text", "request_id", "policy_id"})
+
+
+def is_valid_request_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and REQUEST_ID_PATTERN.fullmatch(value) is not None
+
+
+def is_valid_policy_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and POLICY_ID_PATTERN.fullmatch(value) is not None
 
 
 class Boundary(str, Enum):
@@ -98,6 +114,8 @@ def utf8_len(text: str) -> int:
 def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
     if not isinstance(data, Mapping):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
+    if any(key not in ENVELOPE_KEYS for key in data):
+        raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     try:
         boundary = Boundary(data.get("boundary"))
     except ValueError:
@@ -112,9 +130,9 @@ def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
         raise EnvelopeError(ReasonCode.LIMIT_EXCEEDED)
     request_id = data.get("request_id")
     policy_id = data.get("policy_id")
-    if not isinstance(request_id, str) or not request_id:
+    if not is_valid_request_id(request_id):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
-    if not isinstance(policy_id, str) or not policy_id:
+    if not is_valid_policy_id(policy_id):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     return ValidatedEnvelope(
         boundary=boundary,

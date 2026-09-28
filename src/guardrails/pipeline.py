@@ -9,13 +9,14 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from .audit import build_event
+from .audit import build_event, safe_boundary, safe_request_id
 from .contracts import (
     Action,
     Decision,
     EnvelopeError,
     ReasonCode,
     RequestBudget,
+    is_valid_request_id,
     utf8_len,
     validate_envelope,
 )
@@ -129,9 +130,9 @@ class Pipeline:
         rule_ids: tuple[str, ...] = ()
         if not isinstance(envelope_data, Mapping):
             return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start)
-        raw_boundary = envelope_data.get("boundary", "")
-        boundary = str(getattr(raw_boundary, "value", raw_boundary))
-        request_id = str(envelope_data.get("request_id", ""))
+        # Only validated vocabulary / bounded ids may reach the audit sink (M1).
+        boundary = safe_boundary(envelope_data.get("boundary"))
+        request_id = safe_request_id(envelope_data.get("request_id"))
         try:
             envelope = validate_envelope(envelope_data, self.policy)
         except EnvelopeError as exc:
@@ -261,12 +262,14 @@ class Pipeline:
             return self._collect_model_output(chunks, start, request_id)
         except Exception:  # noqa: BLE001 - fail closed
             return self._fail_closed(
-                ReasonCode.DETECTOR_ERROR, start, "model_output", _safe_str(request_id)
+                ReasonCode.DETECTOR_ERROR, start, "model_output", safe_request_id(request_id)
             )
 
     def _collect_model_output(self, chunks: Any, start: int, request_id: Any) -> Decision:
-        if not isinstance(request_id, str) or not request_id:
-            return self._fail_closed(ReasonCode.INVALID_ENVELOPE, start, "model_output")
+        if not is_valid_request_id(request_id):
+            return self._fail_closed(
+                ReasonCode.INVALID_ENVELOPE, start, "model_output", safe_request_id(request_id)
+            )
         buffered: list[str] = []
         total = 0
         _, bytes_used = self.request_usage(request_id)
@@ -395,7 +398,7 @@ class Pipeline:
         if sink is None:
             return
         event = build_event(
-            request_id=request_id or "unknown",
+            request_id=request_id,
             boundary=boundary,
             action=decision.action,
             reason_codes=decision.reason_codes,
@@ -423,10 +426,6 @@ class _RequestState:
         with self.lock:
             self.remaining_ms -= max(0, elapsed_ms)
             return self.remaining_ms < 0
-
-
-def _safe_str(value: Any) -> str:
-    return value if isinstance(value, str) else ""
 
 
 class _PipelineBlock(Exception):
