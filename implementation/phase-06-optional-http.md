@@ -1,6 +1,6 @@
 # Phase 06 — Optional HTTP adapter
 
-Status: NOT_STARTED
+Status: IMPLEMENTED (stdlib adapter, auth/body/admission/parity tests recorded passing; blocking: load/supervisor drill + deployment review pending)
 
 ## Goal
 
@@ -26,8 +26,8 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Confirm the named client and choose the smallest established web dependency at implementation time.
-- [ ] Write auth/body/admission/parity tests before wrapping inspect.
+- [x] Confirm the named client and choose the smallest established web dependency at implementation time.
+- [x] Write auth/body/admission/parity tests before wrapping inspect.
 - [ ] Load-test supervisor recovery, document limitations and obtain deployment review.
 
 ## Tests and verification

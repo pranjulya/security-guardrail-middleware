@@ -1,6 +1,6 @@
 # Phase 01 — Policy and boundary validation
 
-Status: IN_PROGRESS (implemented on branch `phase-01-policy-boundaries`, tests passing)
+Status: TESTED (12 contract checks recorded passing; blocking: owner acceptance/ADR acceptance pending)
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # Phase 03 — Injection rules and tool authorization
 
-Status: IN_PROGRESS (implemented on branch `phase-03-injection-tools`, tests passing)
+Status: TESTED (14 injection/tool checks recorded passing; review 02: author-written eval shows 91/120 injection detection and 0/200 benign injection FPs, not independent; blocking: independent held-out corpus NOT RUN)
 
 ## Goal
 

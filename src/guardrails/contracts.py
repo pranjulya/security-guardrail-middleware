@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping, Optional, Tuple
-
+from typing import Any, TypeGuard
 
 MAX_TEXT_BYTES = 16 * 1024
 MAX_AGGREGATE_BYTES = 64 * 1024
@@ -13,9 +14,28 @@ MAX_BLOCKS = 4
 INSPECTION_BUDGET_MS = 2000
 SUPPORTED_LANGUAGE = "en"
 
-APPROVED_ENTITIES = frozenset(
-    {"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"}
-)
+# Core entities enabled by the default policy (PRD scope).
+DEFAULT_ENTITIES = frozenset({"EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "PERSON"})
+# Opt-in entities a policy may enable (review 02, M3): not in the default
+# policy because changing its scope is an owner decision; see
+# docs/architecture/ADRs/ADR-002-pii.md.
+OPT_IN_ENTITIES = frozenset({"US_SSN", "IBAN_CODE", "SECRET_TOKEN"})
+APPROVED_ENTITIES = DEFAULT_ENTITIES | OPT_IN_ENTITIES
+
+
+# Envelope identifiers are bounded and charset-restricted so they are safe to
+# log verbatim (review 02, L8/M1). Anything else is rejected, never logged.
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,64}")
+POLICY_ID_PATTERN = re.compile(r"[A-Za-z0-9._:@+-]{1,128}")
+ENVELOPE_KEYS = frozenset({"boundary", "language", "text", "request_id", "policy_id"})
+
+
+def is_valid_request_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and REQUEST_ID_PATTERN.fullmatch(value) is not None
+
+
+def is_valid_policy_id(value: object) -> TypeGuard[str]:
+    return isinstance(value, str) and POLICY_ID_PATTERN.fullmatch(value) is not None
 
 
 class Boundary(str, Enum):
@@ -42,6 +62,7 @@ class ReasonCode(str, Enum):
     PII_REDACTED = "PII_REDACTED"
     RESIDUAL_PII = "RESIDUAL_PII"
     TOOL_DENIED = "TOOL_DENIED"
+    AUDIT_ERROR = "AUDIT_ERROR"
 
 
 class EnvelopeError(Exception):
@@ -66,11 +87,13 @@ class ValidatedEnvelope:
 @dataclass(frozen=True)
 class Decision:
     action: Action
-    reason_codes: Tuple[ReasonCode, ...]
+    reason_codes: tuple[ReasonCode, ...]
     policy_version: str
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
-    safe_text: Optional[str] = field(default=None, repr=False)
+    safe_text: str | None = field(default=None, repr=False)
+    # "version@digest[:16]" of the policy that produced the decision (M4).
+    policy_id: str = ""
 
     def __post_init__(self) -> None:
         if self.action is Action.BLOCK and self.safe_text is not None:
@@ -78,18 +101,29 @@ class Decision:
         if self.action in (Action.ALLOW, Action.REDACT) and self.safe_text is None:
             raise ValueError("ALLOW/REDACT decisions require safe_text")
 
-    def to_public_dict(self) -> dict:
+    def to_public_dict(self) -> dict[str, Any]:
         return {
             "action": self.action.value,
             "reason_codes": [r.value for r in self.reason_codes],
             "policy_version": self.policy_version,
+            "policy_id": self.policy_id,
             "detector_versions": dict(self.detector_versions),
             "elapsed_ms": self.elapsed_ms,
         }
 
 
+def utf8_len(text: str) -> int:
+    """UTF-8 byte length; unencodable text (e.g. lone surrogates) is invalid."""
+    try:
+        return len(text.encode("utf-8"))
+    except UnicodeEncodeError:
+        raise EnvelopeError(ReasonCode.INVALID_ENVELOPE) from None
+
+
 def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
     if not isinstance(data, Mapping):
+        raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
+    if any(key not in ENVELOPE_KEYS for key in data):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     try:
         boundary = Boundary(data.get("boundary"))
@@ -101,13 +135,13 @@ def validate_envelope(data: Any, policy: Any) -> ValidatedEnvelope:
     if not isinstance(text, str) or not text.strip():
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     max_bytes = getattr(policy, "max_text_bytes", MAX_TEXT_BYTES)
-    if len(text.encode("utf-8")) > max_bytes:
+    if utf8_len(text) > max_bytes:
         raise EnvelopeError(ReasonCode.LIMIT_EXCEEDED)
     request_id = data.get("request_id")
     policy_id = data.get("policy_id")
-    if not isinstance(request_id, str) or not request_id:
+    if not is_valid_request_id(request_id):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
-    if not isinstance(policy_id, str) or not policy_id:
+    if not is_valid_policy_id(policy_id):
         raise EnvelopeError(ReasonCode.INVALID_ENVELOPE)
     return ValidatedEnvelope(
         boundary=boundary,

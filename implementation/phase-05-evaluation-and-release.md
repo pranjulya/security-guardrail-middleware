@@ -1,6 +1,6 @@
 # Phase 05 — Evaluation and release evidence
 
-Status: IN_PROGRESS (implemented on branch `phase-05-evaluation-release`; dev-eval evidence recorded, held-out NOT RUN)
+Status: IMPLEMENTED (9 invariants + dev-eval report; review 02 added author-written PRD-size fixtures, CIs, PII-dense/16 KiB latency, cold start and concurrency 4/8 in `reports/evaluation/review02/`, plus CI; blocking: independent held-out corpora, end-to-end attack prevention with a real model, rollback drill NOT RUN)
 
 ## Goal
 

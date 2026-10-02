@@ -1,6 +1,6 @@
 # Project 10 — Security Guardrail Middleware Implementation Plan
 
-Status: PLANNING_ONLY. Every implementation phase is NOT_STARTED. No security effectiveness or performance result has been measured.
+Status: IMPLEMENTATION IN PROGRESS. Phases 00–05 TESTED (checks recorded passing; owner acceptance pending), phase 06 IMPLEMENTED (load/supervisor drill pending). No security effectiveness or performance claim beyond recorded evidence; held-out evaluation and attack-prevention measurements are NOT RUN.
 
 **Goal:** Build a small, auditable Python guardrail pipeline that reduces prompt-injection risk, redacts explicitly supported PII, and checks input and output before they cross an application boundary.
 
@@ -39,13 +39,13 @@ flowchart LR
 
 | Phase | Scope | Status | Review evidence |
 |---|---|---|---|
-| 00 | Environment, threat model, fixtures | NOT_STARTED | Compatibility and threat review |
-| 01 | Policy, validated envelope, decisions | NOT_STARTED | Boundary and failure tests |
-| 02 | Bounded PII detection/redaction | NOT_STARTED | Span and entity metrics |
-| 03 | Injection risk rules and tool authorization | NOT_STARTED | Direct/indirect and authorization tests |
-| 04 | Full buffered input-to-output flow | NOT_STARTED | No-release-on-failure evidence |
-| 05 | Held-out evaluation and release package | NOT_STARTED | Reproducible reports and limitations |
-| 06 | Optional HTTP service | NOT_STARTED | Auth/body-limit/parity/load checks |
+| 00 | Environment, threat model, fixtures | TESTED | Compatibility and threat review (acceptance pending) |
+| 01 | Policy, validated envelope, decisions | TESTED | Boundary and failure tests (12 passing) |
+| 02 | Bounded PII detection/redaction | TESTED | Span and entity metrics (dev set; held-out pending) |
+| 03 | Injection risk rules and tool authorization | TESTED | Direct/indirect and authorization tests |
+| 04 | Full buffered input-to-output flow | TESTED | No-release-on-failure evidence |
+| 05 | Held-out evaluation and release package | TESTED | Dev report recorded; held-out NOT RUN |
+| 06 | Optional HTTP service | IMPLEMENTED | Auth/body-limit/parity tests; load drill pending |
 
 Detailed plans: [phase index](implementation/README.md). Mandatory V1 stops after 05; 06 requires an actual consumer and explicit scope approval.
 

@@ -1,0 +1,17 @@
+# Review 02 (M9): version-update PRs for Python dependencies and pinned
+# GitHub Actions. (Dependabot *alerts/security updates* are a repository
+# setting and are intentionally left unchanged here.)
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]

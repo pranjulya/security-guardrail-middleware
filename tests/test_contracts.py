@@ -39,7 +39,7 @@ def envelope(**overrides):
 def test_valid_envelope_passes():
     env = validate_envelope(envelope(), VALID_POLICY)
     assert env.boundary is Boundary.USER_INPUT
-    assert env.text_byte_len == len("hello world".encode("utf-8"))
+    assert env.text_byte_len == len(b"hello world")
 
 
 def test_unknown_boundary_rejected():
@@ -109,7 +109,9 @@ def test_policy_rejects_unknown_keys_and_weakened_rules():
     with pytest.raises(PolicyError):
         load_policy({**DEFAULT_POLICY, "extra": True})
     with pytest.raises(PolicyError):
-        load_policy({**DEFAULT_POLICY, "rules": [{"id": "block-direct-override", "action": "BLOCK"}]})
+        load_policy(
+            {**DEFAULT_POLICY, "rules": [{"id": "block-direct-override", "action": "BLOCK"}]}
+        )
     with pytest.raises(PolicyError):
         load_policy({**DEFAULT_POLICY, "max_text_bytes": MAX_TEXT_BYTES + 1})
     with pytest.raises(PolicyError):
@@ -127,6 +129,8 @@ def test_policy_snapshot_immutable_and_versioned():
     assert first.version == "v1.1"
     with pytest.raises(AttributeError):
         first.version = "v2"
+    with pytest.raises(TypeError):  # review 02 M4: thresholds are read-only too
+        first.thresholds["PERSON"] = 0.99  # type: ignore[index]
 
 
 def test_event_serializer_allowlisted_and_canary_free(caplog):
@@ -146,6 +150,7 @@ def test_event_serializer_allowlisted_and_canary_free(caplog):
     assert set(payload) <= {
         "request_id",
         "boundary",
+        "policy_id",
         "action",
         "reason_codes",
         "rule_ids",
@@ -154,8 +159,20 @@ def test_event_serializer_allowlisted_and_canary_free(caplog):
         "elapsed_ms",
         "byte_bucket",
     }
-    with caplog.at_level(logging.INFO):
-        logging.getLogger("guardrails").info(event.serialize())
+    assert CANARY not in event.serialize()
+    # Canary-bearing ids are replaced, never serialized (review 02, M1/M11).
+    with caplog.at_level(logging.DEBUG):
+        leaky = build_event(
+            request_id="req " + CANARY,
+            boundary=CANARY,
+            action=Action.BLOCK,
+            reason_codes=[ReasonCode.INVALID_ENVELOPE],
+            policy_version="v1",
+            detector_versions={},
+            elapsed_ms=0,
+            text_byte_len=0,
+        )
+    assert CANARY not in leaky.serialize()
     assert CANARY not in caplog.text
 
 

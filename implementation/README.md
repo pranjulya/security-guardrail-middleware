@@ -1,6 +1,6 @@
 # Phase execution index
 
-Planning delivery only. All phases NOT_STARTED. Read the master Definition of Done and global constraints before starting.
+Phase execution index. Phases 00–04 TESTED (unit/integration evidence recorded), 05 and 06 IMPLEMENTED (see master table for blockers). No phase is REVIEWED or COMPLETE: ADRs and the threat review are still PROPOSED pending owner acceptance, and independent held-out evaluation has NOT RUN (review 02 added an author-written evaluation set at PRD size, which is not independent). Review 02 fixes: PR #9, `docs/reviews/review-02-findings.md`. Read the master Definition of Done and global constraints before starting.
 
 | Phase | Depends on | Deliverable |
 |---|---|---|

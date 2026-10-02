@@ -1,0 +1,4 @@
+# Synthetic test fixtures (not real credentials) committed in 971133f; the
+# current test file assembles these values at runtime. Format: commit:file:rule:line
+971133fd2c0399995da5ca4279c372cdd337dfcf:tests/test_pii_obfuscation.py:stripe-access-token:88
+971133fd2c0399995da5ca4279c372cdd337dfcf:tests/test_pii_obfuscation.py:jwt:116
