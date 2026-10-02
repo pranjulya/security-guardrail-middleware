@@ -1,6 +1,6 @@
 # Phase 03 — Injection rules and tool authorization
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (implemented on branch `phase-03-injection-tools`, tests passing)
 
 ## Goal
 
@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Write contrasting malicious/benign rule examples and tool denial spies.
-- [ ] Implement finite reviewed rules and a strict host allowlist without URL/shell tools.
-- [ ] Run tests and document a detector-missed case whose tool action is nevertheless denied.
+- [x] Write contrasting malicious/benign rule examples and tool denial spies.
+- [x] Implement finite reviewed rules and a strict host allowlist without URL/shell tools.
+- [x] Run tests and document a detector-missed case whose tool action is nevertheless denied.
 
 ## Tests and verification
 
