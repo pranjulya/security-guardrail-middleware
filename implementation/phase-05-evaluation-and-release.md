@@ -1,6 +1,6 @@
 # Phase 05 — Evaluation and release evidence
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (implemented on branch `phase-05-evaluation-release`; dev-eval evidence recorded, held-out NOT RUN)
 
 ## Goal
 
@@ -26,8 +26,8 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Freeze fixture manifest, model settings and decision policy before held-out execution.
-- [ ] Run evaluation and operational drills, preserving failures and denominators.
+- [x] Freeze fixture manifest, model settings and decision policy before held-out execution.
+- [x] Run evaluation and operational drills, preserving failures and denominators.
 - [ ] Have reviewer reproduce a subset and approve truthful release notes; update statuses only with evidence.
 
 ## Tests and verification
