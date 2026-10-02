@@ -1,6 +1,6 @@
 # Agent instructions — Project 10
 
-This is a planning-only package until the user approves implementation. Read Implementation.md as source of truth, then current phase and affected ADRs. All current ADRs are PROPOSED and all phases NOT_STARTED.
+This is a planning-only package until the user approves implementation beyond phase 00. Read Implementation.md as source of truth, then current phase and affected ADRs. All current ADRs are PROPOSED. Phase 00 is IN_PROGRESS (environment baseline); phases 01–06 are NOT_STARTED.
 
 Work one approved phase at a time. Inspect the actual repository before assuming planned file names exist. Prefer available code graph tools and validate coverage; if unavailable, say so and use targeted source reads. No implementation code, dependencies or runtime configuration belongs in this planning pass.
 

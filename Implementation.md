@@ -1,6 +1,6 @@
 # Project 10 — Security Guardrail Middleware Implementation Plan
 
-Status: PLANNING_ONLY. Every implementation phase is NOT_STARTED. No security effectiveness or performance result has been measured.
+Status: PLANNING_ONLY for application code. Phase 00 is IN_PROGRESS (environment baseline implemented; threat review pending). Phases 01–06 remain NOT_STARTED. No security effectiveness or performance result has been measured.
 
 **Goal:** Build a small, auditable Python guardrail pipeline that reduces prompt-injection risk, redacts explicitly supported PII, and checks input and output before they cross an application boundary.
 
@@ -12,7 +12,7 @@ Status: PLANNING_ONLY. Every implementation phase is NOT_STARTED. No security ef
 
 ## Repository status
 
-Planning folder fallback: no suitable Project 10 repository was identified in the parent task's bounded registered-project/source inventory. No repository or worktree was created. This is not a claim about every disk location. Before implementation, select an existing repository or initialize a dedicated repository, then create a planning/implementation branch or worktree. Graph tools were not exposed; project index and generation could not be verified. There is no existing code architecture being claimed here.
+Repository: [pranjulya/security-guardrail-middleware](https://github.com/pranjulya/security-guardrail-middleware). Planning package only; no guardrail library code has been implemented yet.
 
 ## Global constraints and defaults
 
@@ -39,7 +39,7 @@ flowchart LR
 
 | Phase | Scope | Status | Review evidence |
 |---|---|---|---|
-| 00 | Environment, threat model, fixtures | NOT_STARTED | Compatibility and threat review |
+| 00 | Environment, threat model, fixtures | IN_PROGRESS | Compatibility and threat review |
 | 01 | Policy, validated envelope, decisions | NOT_STARTED | Boundary and failure tests |
 | 02 | Bounded PII detection/redaction | NOT_STARTED | Span and entity metrics |
 | 03 | Injection risk rules and tool authorization | NOT_STARTED | Direct/indirect and authorization tests |
