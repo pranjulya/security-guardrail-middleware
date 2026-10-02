@@ -1,6 +1,6 @@
 # Phase 02 — PII redaction
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (implemented on branch `phase-02-pii-redaction`, tests passing)
 
 ## Goal
 
@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Annotate golden original-text spans before detector integration.
-- [ ] Implement local detection, deterministic union/replacement and one residual scan.
-- [ ] Calibrate thresholds on development cases, freeze policy version and review golden/exception tests.
+- [x] Annotate golden original-text spans before detector integration.
+- [x] Implement local detection, deterministic union/replacement and one residual scan.
+- [x] Calibrate thresholds on development cases, freeze policy version and review golden/exception tests.
 
 ## Tests and verification
 
