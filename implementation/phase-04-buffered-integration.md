@@ -1,6 +1,6 @@
 # Phase 04 — Buffered end-to-end integration
 
-Status: NOT_STARTED
+Status: IN_PROGRESS (implemented on branch `phase-04-buffered-integration`, tests passing)
 
 ## Goal
 
@@ -26,9 +26,9 @@ These paths are implementation targets, not files created in this planning deliv
 
 ## Ordered work
 
-- [ ] Write sink/call-order spies and inject failures at every boundary.
-- [ ] Implement ordered pipeline and bounded request accounting with fixed safe refusal.
-- [ ] Run integration plus prior tests; inspect all captured sinks for synthetic sensitive markers.
+- [x] Write sink/call-order spies and inject failures at every boundary.
+- [x] Implement ordered pipeline and bounded request accounting with fixed safe refusal.
+- [x] Run integration plus prior tests; inspect all captured sinks for synthetic sensitive markers.
 
 ## Tests and verification
 
