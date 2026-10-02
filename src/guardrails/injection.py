@@ -13,7 +13,6 @@ MAX_NORMALIZED_CHARS = 16 * 1024
 @dataclass(frozen=True)
 class InjectionFinding:
     rule_id: str
-    matched: str
 
 
 _RULE_PATTERNS: Tuple[Tuple[str, str], ...] = (
@@ -37,23 +36,20 @@ def normalized_view(text: str) -> str:
     return collapsed[:MAX_NORMALIZED_CHARS]
 
 
-def detect(text: str, rule_ids: Optional[Iterable[str]] = None) -> Tuple[InjectionFinding, ...]:
+def detect(
+    text: str, rule_ids: Optional[Iterable[str]] = None
+) -> Tuple[InjectionFinding, ...]:
     wanted = set(rule_ids) if rule_ids is not None else None
-    findings: list[InjectionFinding] = []
+    found: dict[str, InjectionFinding] = {}
     for view in (text, normalized_view(text)):
         for rule_id, pattern in _COMPILED:
+            if rule_id in found:
+                continue
             if wanted is not None and rule_id not in wanted:
                 continue
-            match = pattern.search(view)
-            if match:
-                findings.append(InjectionFinding(rule_id=rule_id, matched=match.group(0)[:200]))
-                break
-        if findings:
-            break
-    seen: dict[str, InjectionFinding] = {}
-    for finding in findings:
-        seen.setdefault(finding.rule_id, finding)
-    return tuple(seen.values())
+            if pattern.search(view):
+                found[rule_id] = InjectionFinding(rule_id=rule_id)
+    return tuple(found.values())
 
 
 def is_blocked(text: str, rule_ids: Optional[Iterable[str]] = None) -> bool:

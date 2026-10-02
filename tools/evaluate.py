@@ -26,7 +26,7 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_jsonl(path: Path) -> list:
+def load_fixture(path: Path) -> list:
     data = json.loads(path.read_text())
     if isinstance(data, dict) and "records" in data:
         return data["records"]
@@ -108,7 +108,7 @@ def main() -> int:
         detector=_presidio_detector))
 
     fixture_path = ROOT / args.fixtures
-    records = load_jsonl(fixture_path)
+    records = load_fixture(fixture_path)
     pii = pii_metrics(redactor, records)
     perf = timing_stats(factory, repeats=args.repeats)
 

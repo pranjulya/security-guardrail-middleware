@@ -12,6 +12,7 @@ _ALLOWED_KEYS = frozenset(
         "boundary",
         "action",
         "reason_codes",
+        "rule_ids",
         "policy_version",
         "detector_versions",
         "elapsed_ms",
@@ -35,6 +36,7 @@ class InspectionEvent:
     boundary: str
     action: str
     reason_codes: tuple = ()
+    rule_ids: tuple = ()
     policy_version: str = ""
     detector_versions: Mapping[str, str] = field(default_factory=dict)
     elapsed_ms: int = 0
@@ -46,6 +48,7 @@ class InspectionEvent:
             "boundary": self.boundary,
             "action": self.action,
             "reason_codes": list(self.reason_codes),
+            "rule_ids": list(self.rule_ids),
             "policy_version": self.policy_version,
             "detector_versions": dict(self.detector_versions),
             "elapsed_ms": self.elapsed_ms,
@@ -66,15 +69,18 @@ def build_event(
     detector_versions: Mapping[str, str] | None = None,
     elapsed_ms: int = 0,
     text_byte_len: int = 0,
+    rule_ids: Any = (),
 ) -> InspectionEvent:
     boundary_value = getattr(boundary, "value", boundary)
     action_value = getattr(action, "value", action)
     codes = [getattr(r, "value", r) for r in reason_codes]
+    rules = [getattr(r, "value", r) for r in rule_ids]
     return InspectionEvent(
         request_id=request_id,
         boundary=str(boundary_value),
         action=str(action_value),
         reason_codes=tuple(codes),
+        rule_ids=tuple(rules),
         policy_version=policy_version,
         detector_versions=dict(detector_versions or {}),
         elapsed_ms=elapsed_ms,

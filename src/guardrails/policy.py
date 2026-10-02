@@ -157,7 +157,7 @@ def load_policy(data: Any) -> PolicySnapshot:
 
 
 DEFAULT_POLICY = {
-    "version": "v1",
+    "version": "v1.1",
     "entities": sorted(APPROVED_ENTITIES),
     "thresholds": {e: (0.4 if e == "PHONE_NUMBER" else 0.5) for e in sorted(APPROVED_ENTITIES)},
     "rules": [

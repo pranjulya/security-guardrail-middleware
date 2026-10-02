@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Mapping, Optional, Tuple
 
 from .contracts import Action, ReasonCode
 
@@ -32,14 +32,26 @@ class DetectorFailure(Exception):
     pass
 
 
+_ENGINE: Any = None
+
+
+def _get_engine():
+    global _ENGINE
+    if _ENGINE is None:
+        from presidio_analyzer import AnalyzerEngine
+
+        _ENGINE = AnalyzerEngine()
+    return _ENGINE
+
+
 def _presidio_detector(
     text: str, language: str, entities: Optional[Iterable[str]]
 ) -> List[DetectedSpan]:
-    from presidio_analyzer import AnalyzerEngine
-
-    engine = AnalyzerEngine()
+    engine = _get_engine()
     try:
-        results = engine.analyze(text=text, language=language, entities=list(entities) if entities else None)
+        results = engine.analyze(
+            text=text, language=language, entities=list(entities) if entities else None
+        )
     except Exception as exc:
         raise DetectorFailure() from exc
     spans = []
@@ -108,21 +120,18 @@ def _precedence(entity_type: str) -> int:
 
 def _replace_union(text: str, spans: List[DetectedSpan]) -> str:
     ordered = sorted(spans, key=lambda s: (s.start, s.end))
-    groups: List[List[DetectedSpan]] = []
+    groups: List[list] = []
     for span in ordered:
-        if groups and span.start < groups[-1][-1].end:
-            groups[-1].append(span)
-        elif groups and span.start == groups[-1][-1].end:
-            groups[-1].append(span)
+        if groups and span.start < groups[-1][1]:
+            groups[-1][1] = max(groups[-1][1], span.end)
+            groups[-1][2].append(span.entity_type)
         else:
-            groups.append([span])
-    merged: List[Tuple[int, int, str]] = []
-    for group in groups:
-        start = min(s.start for s in group)
-        end = max(s.end for s in group)
-        label_entity = min((s.entity_type for s in group), key=_precedence)
-        merged.append((start, end, REDACTION_LABELS[label_entity]))
-    out = text
-    for start, end, label in sorted(merged, key=lambda m: m[0], reverse=True):
-        out = out[:start] + label + out[end:]
-    return out
+            groups.append([span.start, span.end, [span.entity_type]])
+    parts: List[str] = []
+    prev_end = 0
+    for start, end, entities in groups:
+        parts.append(text[prev_end:start])
+        parts.append(REDACTION_LABELS[min(entities, key=_precedence)])
+        prev_end = end
+    parts.append(text[prev_end:])
+    return "".join(parts)

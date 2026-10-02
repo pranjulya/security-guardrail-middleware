@@ -34,7 +34,7 @@ def pipeline(**overrides):
 
 def env(**overrides):
     data = {"boundary": "user_input", "language": "en", "text": "hello",
-            "request_id": "req-1", "policy_id": "v1"}
+            "request_id": "req-1", "policy_id": POLICY.version}
     data.update(overrides)
     return data
 
@@ -59,8 +59,8 @@ def test_oversize_blocked_with_no_text():
 def test_fifth_block_rejected():
     pipe = pipeline()
     for i in range(4):
-        pipe.inspect(env(text=f"ok {i}", request_id=f"r{i}"))
-    fifth = pipe.inspect(env(text="fifth", request_id="r5"))
+        pipe.inspect(env(text=f"ok {i}", request_id="req-budget"))
+    fifth = pipe.inspect(env(text="fifth", request_id="req-budget"))
     assert fifth.action is Action.BLOCK
     assert fifth.reason_codes == (ReasonCode.LIMIT_EXCEEDED,)
 

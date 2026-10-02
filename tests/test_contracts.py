@@ -11,6 +11,7 @@ from guardrails.contracts import (
     MAX_TEXT_BYTES,
     Action,
     Boundary,
+    Decision,
     EnvelopeError,
     ReasonCode,
     RequestBudget,
@@ -123,7 +124,7 @@ def test_policy_snapshot_immutable_and_versioned():
     first = load_policy(DEFAULT_POLICY)
     second = load_policy(DEFAULT_POLICY)
     assert first.digest == second.digest
-    assert first.version == "v1"
+    assert first.version == "v1.1"
     with pytest.raises(AttributeError):
         first.version = "v2"
 
@@ -147,6 +148,7 @@ def test_event_serializer_allowlisted_and_canary_free(caplog):
         "boundary",
         "action",
         "reason_codes",
+        "rule_ids",
         "policy_version",
         "detector_versions",
         "elapsed_ms",
@@ -164,3 +166,16 @@ def test_envelope_error_never_echoes_payload():
     except EnvelopeError as exc:
         assert CANARY not in str(exc)
         assert exc.reason is ReasonCode.UNSUPPORTED_LANGUAGE
+
+
+def test_repr_never_contains_text():
+    decision = Decision(
+        action=Action.ALLOW,
+        reason_codes=(),
+        policy_version="v1.1",
+        safe_text=CANARY,
+    )
+    assert CANARY not in repr(decision)
+    assert CANARY not in str(decision)
+    env = validate_envelope(envelope(text=CANARY), VALID_POLICY)
+    assert CANARY not in repr(env)

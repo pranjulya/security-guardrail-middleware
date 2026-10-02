@@ -1,0 +1,11 @@
+{
+  "detector": "presidio-analyzer==2.2.360/en_core_web_lg==3.8.0",
+  "fixture_sha256": "2012865c40cf686a6da5d789a3c8bb1a3cf56051cafc32c628ece899d2afb417",
+  "fixtures": "tests/fixtures/pii-development.jsonl",
+  "platform": "macOS-26.5-arm64-arm-64bit",
+  "policy_digest": "ae230164b8b681685526930bd21a258e6320870773b0a56486e8a7eab3d00fb1",
+  "policy_version": "v1.1",
+  "python": "3.12.13",
+  "repeats": 200,
+  "run_id": "review01-postfix"
+}
