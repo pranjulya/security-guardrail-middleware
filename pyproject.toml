@@ -21,8 +21,9 @@ test = [
     "pytest==8.4.2",
 ]
 
-[tool.setuptools.packages.find]
-namespaces = false
+[tool.setuptools.package-dir]
+"" = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
