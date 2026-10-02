@@ -11,7 +11,7 @@ Assets: user text, model-facing context, response content, policy integrity, too
 | Policy tampering | Reviewed versioned local policy, strict startup validation | Compromised filesystem/host is out of scope |
 | Resource exhaustion | UTF-8 byte caps, block count, bounded concurrency/deadline | CPU detector cannot be force-killed by thread timer; no late release, optional phase 06 process isolation for termination |
 | Telemetry disclosure | Allowlisted event schema, no bodies/mappings | Third-party defaults may leak; canary inspection |
-| Dependency compromise | Pin package/model artifacts, license review, update scans | Pins alone do not establish provenance |
+| Dependency compromise | Pin package/model artifacts (hashed `requirements-lock.txt` / `requirements-dev-lock.txt`, model wheel by URL + sha256), license review, CI `pip-audit --strict` on both locks on every push/PR, weekly Dependabot version PRs, gitleaks secret scan | Pins alone do not establish provenance; the model wheel is not covered by pip-audit/OSV |
 
 Do not place credentials or genuinely confidential instructions in prompts. Redaction is best-effort data minimization within declared coverage, not anonymization proof or legal compliance. All fixtures are synthetic and visibly labeled; avoid real account identifiers even in examples. Disable unneeded network egress in the local demo after dependencies/models are installed.
 

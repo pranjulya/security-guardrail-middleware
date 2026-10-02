@@ -1,6 +1,6 @@
 # Phase 02 — PII redaction
 
-Status: TESTED (14 PII checks recorded passing incl. live Presidio; blocking: held-out per-category metrics pending phase 05)
+Status: TESTED (14 PII checks recorded passing incl. live Presidio; review 02 added obfuscation handling and an author-written eval at >=140 positives/entity in `reports/evaluation/review02/`; blocking: independent held-out per-category metrics NOT RUN)
 
 ## Goal
 

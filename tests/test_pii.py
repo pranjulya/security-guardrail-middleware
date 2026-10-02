@@ -82,7 +82,7 @@ def test_unicode_offsets_use_original_text():
             return []
         return [span("PERSON", start, end, 0.9)]
 
-    out, action, _ = redactor(detector).redact(text)
+    out, _action, _ = redactor(detector).redact(text)
     assert out == "[PERSON] lives here"
     assert name not in out
 
@@ -98,7 +98,7 @@ def test_overlapping_spans_union_no_fragments():
             span("EMAIL_ADDRESS", 8, 28, 1.0),
         ]
 
-    out, action, _ = redactor(detector).redact(text)
+    out, _action, _ = redactor(detector).redact(text)
     assert out == "Contact [EMAIL_ADDRESS] today"
     assert "jane.doe" not in out
     assert "example.com" not in out
@@ -135,7 +135,7 @@ def test_adjacent_non_overlapping_stay_separate():
 
 
 def test_no_match_allows():
-    out, action, reasons = redactor(lambda t, l, e: []).redact("plain benign text")
+    out, action, reasons = redactor(lambda t, lang, e: []).redact("plain benign text")
     assert (out, action, reasons) == ("plain benign text", Action.ALLOW, ())
 
 
@@ -143,7 +143,7 @@ def test_below_threshold_ignored():
     def detector(t, lang, entities):
         return [span("PERSON", 0, 5, PERSON_THRESHOLD - 0.1)]
 
-    out, action, _ = redactor(detector).redact("Alice went home")
+    _out, action, _ = redactor(detector).redact("Alice went home")
     assert action is Action.ALLOW
 
 
@@ -151,7 +151,7 @@ def test_unsupported_category_filtered():
     def detector(t, lang, entities):
         return [span("DATE_TIME", 0, 5, 1.0)]
 
-    out, action, _ = redactor(detector).redact("Alice went home")
+    _out, action, _ = redactor(detector).redact("Alice went home")
     assert action is Action.ALLOW
 
 

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=70"]
+requires = ["setuptools>=77"]  # PEP 639 SPDX `license = "MIT"` needs >=77
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,16 +9,24 @@ description = "Small auditable Python guardrail pipeline (planning: phase 00 bas
 readme = "Implementation.md"
 requires-python = "==3.12.*"
 license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "presidio-analyzer==2.2.360",
-    "presidio-anonymizer==2.2.360",
     "spacy==3.8.16",
-    "en-core-web-lg==3.8.0",
+    # spaCy models are not published on PyPI: pin the official release wheel by
+    # URL + sha256 so `pip install .` / `uv pip install .` work in one step.
+    "en-core-web-lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl#sha256=293e9547a655b25499198ab15a525b05b9407a75f10255e405e8c3854329ab63",
 ]
 
 [project.optional-dependencies]
 test = [
-    "pytest==8.4.2",
+    "pytest==9.1.1",  # >=9.0.3 for PYSEC-2026-1845 / CVE-2025-71176
+]
+dev = [
+    "ruff==0.16.9",
+    "mypy==2.3.1",
+    "bandit==1.9.4",
+    "pip-audit==2.10.1",
 ]
 
 [tool.setuptools.package-dir]
@@ -27,6 +35,32 @@ test = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+guardrails = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["reports"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP", "RUF", "S", "BLE"]
+# (str, Enum) is kept deliberately: StrEnum changes str() output of public enums.
+ignore = ["UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use assert by design and synthetic secrets/tokens; randomness is not crypto.
+"tests/**" = ["S101", "S104", "S105", "S106", "S311", "S603", "BLE001"]
+# Confusable/homoglyph tables and evasion fixtures are intentionally non-ASCII.
+"src/guardrails/injection.py" = ["RUF001", "RUF003"]
+"tests/test_injection*.py" = ["RUF001", "RUF003"]
+"tools/**" = ["S311", "RUF001", "RUF003"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "examples", "tools"]

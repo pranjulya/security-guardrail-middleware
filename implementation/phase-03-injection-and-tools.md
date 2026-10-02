@@ -1,6 +1,6 @@
 # Phase 03 — Injection rules and tool authorization
 
-Status: TESTED (14 injection/tool checks recorded passing; blocking: benign false-positive rate pending held-out corpus)
+Status: TESTED (14 injection/tool checks recorded passing; review 02: author-written eval shows 91/120 injection detection and 0/200 benign injection FPs, not independent; blocking: independent held-out corpus NOT RUN)
 
 ## Goal
 

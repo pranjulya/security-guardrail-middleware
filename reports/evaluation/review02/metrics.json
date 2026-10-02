@@ -1,0 +1,742 @@
+{
+  "cold_start": {
+    "no_warm_up": {
+      "action": "BLOCK",
+      "first_inspect_ms": 2000,
+      "import_ms": 70,
+      "reason_codes": [
+        "DEADLINE_EXCEEDED"
+      ],
+      "warm_up_ms": null
+    },
+    "with_warm_up": {
+      "action": "ALLOW",
+      "first_inspect_ms": 6,
+      "import_ms": 60,
+      "reason_codes": [],
+      "warm_up_ms": 2160
+    }
+  },
+  "concurrency": {
+    "4": {
+      "max_ms": 378.33,
+      "mean_ms": 339.82,
+      "n": 40,
+      "p50_ms": 334.99,
+      "p95_ms": 367.81,
+      "p99_ms": 378.33
+    },
+    "8": {
+      "max_ms": 878.0,
+      "mean_ms": 762.95,
+      "n": 80,
+      "p50_ms": 760.36,
+      "p95_ms": 862.82,
+      "p99_ms": 878.0
+    }
+  },
+  "false_positives": {
+    "by_family": {
+      "business-numbers": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 5,
+        "pii_fp_rate": 0.25
+      },
+      "code-snippet": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "dates-prices": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "model-reply": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "near-miss-wording": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "retrieved-doc": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "security-discussion": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "support-question": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      },
+      "tech-terms": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 14,
+        "pii_fp_rate": 0.7
+      },
+      "tool-json": {
+        "inj_fp": 0,
+        "injection_fp_rate": 0.0,
+        "n": 20,
+        "pii_fp": 0,
+        "pii_fp_rate": 0.0
+      }
+    },
+    "injection_fp": 0,
+    "injection_fp_ci95": [
+      0.0,
+      0.0188
+    ],
+    "injection_fp_rate": 0.0,
+    "n": 200,
+    "pii_fp": 19,
+    "pii_fp_ci95": [
+      0.0617,
+      0.1436
+    ],
+    "pii_fp_rate": 0.095
+  },
+  "injection": {
+    "by_family": {
+      "data-exfiltration": {
+        "detection_rate": 0.6667,
+        "fn": 5,
+        "n": 15,
+        "tp": 10
+      },
+      "destructive-action": {
+        "detection_rate": 0.7333,
+        "fn": 4,
+        "n": 15,
+        "tp": 11
+      },
+      "direct-override": {
+        "detection_rate": 0.8,
+        "fn": 3,
+        "n": 15,
+        "tp": 12
+      },
+      "fake-delimiter": {
+        "detection_rate": 0.8,
+        "fn": 3,
+        "n": 15,
+        "tp": 12
+      },
+      "indirect-injection": {
+        "detection_rate": 0.8667,
+        "fn": 2,
+        "n": 15,
+        "tp": 13
+      },
+      "obfuscated-override": {
+        "detection_rate": 0.8667,
+        "fn": 2,
+        "n": 15,
+        "tp": 13
+      },
+      "prompt-exfiltration": {
+        "detection_rate": 0.8667,
+        "fn": 2,
+        "n": 15,
+        "tp": 13
+      },
+      "roleplay-jailbreak": {
+        "detection_rate": 0.4667,
+        "fn": 8,
+        "n": 15,
+        "tp": 7
+      }
+    },
+    "detected": 91,
+    "detection_ci95": [
+      0.6745,
+      0.8261
+    ],
+    "detection_rate": 0.7583,
+    "n": 120
+  },
+  "obfuscated": {
+    "by_entity": {
+      "CREDIT_CARD": {
+        "fn": 16,
+        "fp": 0,
+        "positives": 48,
+        "precision": 1.0,
+        "precision_ci95": [
+          0.8928,
+          1.0
+        ],
+        "recall": 0.6667,
+        "recall_ci95": [
+          0.5254,
+          0.7832
+        ],
+        "tp": 32
+      },
+      "EMAIL_ADDRESS": {
+        "fn": 8,
+        "fp": 0,
+        "positives": 40,
+        "precision": 1.0,
+        "precision_ci95": [
+          0.8928,
+          1.0
+        ],
+        "recall": 0.8,
+        "recall_ci95": [
+          0.6524,
+          0.895
+        ],
+        "tp": 32
+      },
+      "PERSON": {
+        "fn": 0,
+        "fp": 9,
+        "positives": 0,
+        "precision": 0.0,
+        "precision_ci95": [
+          0.0,
+          0.2992
+        ],
+        "recall": 0.0,
+        "recall_ci95": [
+          0.0,
+          0.0
+        ],
+        "tp": 0
+      },
+      "PHONE_NUMBER": {
+        "fn": 0,
+        "fp": 1,
+        "positives": 16,
+        "precision": 0.9412,
+        "precision_ci95": [
+          0.7302,
+          0.9895
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.8064,
+          1.0
+        ],
+        "tp": 16
+      }
+    },
+    "by_family": {
+      "card-dotted": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "card-fullwidth-digits": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "card-nbsp": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "card-slash": {
+        "fn": 8,
+        "fp": 1,
+        "n": 8,
+        "tp": 0
+      },
+      "card-spelled-digits": {
+        "fn": 8,
+        "fp": 0,
+        "n": 8,
+        "tp": 0
+      },
+      "card-zero-width": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "email-bracket-at-dot": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "email-fullwidth-at": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "email-paren-at-dot": {
+        "fn": 0,
+        "fp": 1,
+        "n": 8,
+        "tp": 8
+      },
+      "email-spelled-at-dot": {
+        "fn": 8,
+        "fp": 0,
+        "n": 8,
+        "tp": 0
+      },
+      "email-zero-width": {
+        "fn": 0,
+        "fp": 8,
+        "n": 8,
+        "tp": 8
+      },
+      "phone-fullwidth-digits": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      },
+      "phone-zero-width": {
+        "fn": 0,
+        "fp": 0,
+        "n": 8,
+        "tp": 8
+      }
+    },
+    "leakage_cases": 23,
+    "residual_blocks": 0
+  },
+  "performance": {
+    "benign@16384B": {
+      "max_ms": 360.88,
+      "mean_ms": 306.37,
+      "n": 30,
+      "p50_ms": 301.92,
+      "p95_ms": 338.56,
+      "p99_ms": 360.88
+    },
+    "benign@4096B": {
+      "max_ms": 119.05,
+      "mean_ms": 74.1,
+      "n": 30,
+      "p50_ms": 71.26,
+      "p95_ms": 87.6,
+      "p99_ms": 119.05
+    },
+    "benign@512B": {
+      "max_ms": 79.97,
+      "mean_ms": 16.0,
+      "n": 30,
+      "p50_ms": 13.02,
+      "p95_ms": 18.28,
+      "p99_ms": 79.97
+    },
+    "pii-dense@16384B": {
+      "max_ms": 1262.77,
+      "mean_ms": 1116.59,
+      "n": 30,
+      "p50_ms": 1106.28,
+      "p95_ms": 1167.56,
+      "p99_ms": 1262.77
+    },
+    "pii-dense@4096B": {
+      "max_ms": 264.98,
+      "mean_ms": 243.95,
+      "n": 30,
+      "p50_ms": 240.77,
+      "p95_ms": 262.65,
+      "p99_ms": 264.98
+    },
+    "pii-dense@512B": {
+      "max_ms": 48.85,
+      "mean_ms": 38.43,
+      "n": 30,
+      "p50_ms": 37.81,
+      "p95_ms": 47.46,
+      "p99_ms": 48.85
+    }
+  },
+  "phone_person_tradeoff": {
+    "cases": [
+      {
+        "case": "order-number",
+        "hits": [
+          {
+            "end": 16,
+            "entity": "PHONE_NUMBER",
+            "score": 0.4,
+            "start": 6
+          }
+        ],
+        "text": "Order 9040620724 shipped this morning."
+      },
+      {
+        "case": "invoice-number",
+        "hits": [
+          {
+            "end": 25,
+            "entity": "PHONE_NUMBER",
+            "score": 0.75,
+            "start": 15
+          }
+        ],
+        "text": "Invoice number 4251479784 for your records."
+      },
+      {
+        "case": "error-code",
+        "hits": [
+          {
+            "end": 21,
+            "entity": "PERSON",
+            "score": 0.85,
+            "start": 11
+          }
+        ],
+        "text": "Error code 0x80074005 appeared during install."
+      },
+      {
+        "case": "django",
+        "hits": [
+          {
+            "end": 17,
+            "entity": "PERSON",
+            "score": 0.85,
+            "start": 11
+          }
+        ],
+        "text": "Deploy the Django app with gunicorn behind nginx."
+      },
+      {
+        "case": "siri",
+        "hits": [
+          {
+            "end": 8,
+            "entity": "PERSON",
+            "score": 0.85,
+            "start": 4
+          }
+        ],
+        "text": "Ask Siri to set a timer for ten minutes."
+      },
+      {
+        "case": "alexa",
+        "hits": [],
+        "text": "Alexa, play some jazz in the kitchen."
+      }
+    ],
+    "note": "Measured against the default thresholds; see calibration.md."
+  },
+  "pii": {
+    "by_entity": {
+      "CREDIT_CARD": {
+        "fn": 0,
+        "fp": 0,
+        "positives": 140,
+        "precision": 1.0,
+        "precision_ci95": [
+          0.9733,
+          1.0
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.9733,
+          1.0
+        ],
+        "tp": 140
+      },
+      "EMAIL_ADDRESS": {
+        "fn": 0,
+        "fp": 0,
+        "positives": 150,
+        "precision": 1.0,
+        "precision_ci95": [
+          0.975,
+          1.0
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.975,
+          1.0
+        ],
+        "tp": 150
+      },
+      "PERSON": {
+        "fn": 6,
+        "fp": 1,
+        "positives": 160,
+        "precision": 0.9935,
+        "precision_ci95": [
+          0.9644,
+          0.9989
+        ],
+        "recall": 0.9625,
+        "recall_ci95": [
+          0.9206,
+          0.9827
+        ],
+        "tp": 154
+      },
+      "PHONE_NUMBER": {
+        "fn": 0,
+        "fp": 0,
+        "positives": 140,
+        "precision": 1.0,
+        "precision_ci95": [
+          0.9733,
+          1.0
+        ],
+        "recall": 1.0,
+        "recall_ci95": [
+          0.9733,
+          1.0
+        ],
+        "tp": 140
+      }
+    },
+    "by_family": {
+      "credit_card-0": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-1": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-2": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-3": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-4": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-5": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-6": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "credit_card-7": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-0": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-1": {
+        "fn": 0,
+        "fp": 1,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-2": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-3": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-4": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-5": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-6": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "email_address-7": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "mixed-0": {
+        "fn": 1,
+        "fp": 0,
+        "n": 10,
+        "tp": 29
+      },
+      "mixed-1": {
+        "fn": 1,
+        "fp": 0,
+        "n": 10,
+        "tp": 29
+      },
+      "mixed-2": {
+        "fn": 0,
+        "fp": 0,
+        "n": 10,
+        "tp": 20
+      },
+      "mixed-3": {
+        "fn": 0,
+        "fp": 0,
+        "n": 10,
+        "tp": 30
+      },
+      "person-0": {
+        "fn": 1,
+        "fp": 0,
+        "n": 15,
+        "tp": 14
+      },
+      "person-1": {
+        "fn": 2,
+        "fp": 0,
+        "n": 15,
+        "tp": 13
+      },
+      "person-2": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "person-3": {
+        "fn": 1,
+        "fp": 0,
+        "n": 15,
+        "tp": 14
+      },
+      "person-4": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "person-5": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "person-6": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "person-7": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-0": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-1": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-2": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-3": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-4": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-5": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-6": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      },
+      "phone_number-7": {
+        "fn": 0,
+        "fp": 0,
+        "n": 15,
+        "tp": 15
+      }
+    },
+    "leakage_cases": 6,
+    "residual_blocks": 0
+  }
+}

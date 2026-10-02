@@ -1,0 +1,123 @@
+# Review 02 (M9, L13): tests, lint, types, security scans and a clean install
+# on every push and pull request. Actions are pinned by commit SHA; the token
+# is read-only.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  test:
+    name: clean install + pytest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Clean install from the hashed lock (no network resolution)
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --require-hashes --no-deps -r requirements-lock.txt
+          python -m pip install --no-deps -e .
+          python -m pip check
+      - name: pytest
+        run: |
+          . .venv/bin/activate
+          python -m pytest -q -p no:cacheprovider
+      - name: Example smoke run
+        run: |
+          . .venv/bin/activate
+          python examples/synthetic_assistant.py --stub
+
+  lint:
+    name: ruff + mypy + bandit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install dev tools from the hashed lock
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --require-hashes --no-deps -r requirements-dev-lock.txt
+          python -m pip install --no-deps -e .
+      - name: ruff check
+        run: .venv/bin/ruff check .
+      - name: ruff format --check
+        run: .venv/bin/ruff format --check .
+      - name: mypy --strict
+        run: .venv/bin/mypy
+      - name: bandit
+        run: .venv/bin/bandit -q -r src tools examples
+
+  audit:
+    name: pip-audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit from the hashed dev lock
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --require-hashes --no-deps -r requirements-dev-lock.txt
+      # The spaCy model is a direct-URL, sha256-pinned wheel that pip-audit
+      # cannot look up; everything else is audited with --strict.
+      - name: Audit runtime lock
+        run: |
+          python tools/strip_url_requirements.py requirements-lock.txt > "$RUNNER_TEMP/runtime.txt"
+          .venv/bin/pip-audit --strict --require-hashes --disable-pip -r "$RUNNER_TEMP/runtime.txt"
+      - name: Audit dev lock
+        run: |
+          python tools/strip_url_requirements.py requirements-dev-lock.txt > "$RUNNER_TEMP/dev.txt"
+          .venv/bin/pip-audit --strict --require-hashes --disable-pip -r "$RUNNER_TEMP/dev.txt"
+
+  secrets:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks 8.28.0 (checksum-verified)
+        env:
+          GITLEAKS_VERSION: "8.28.0"
+          GITLEAKS_SHA256: "a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb"
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+      - name: Scan full history
+        run: ./gitleaks git --no-banner --redact --exit-code 1 .
